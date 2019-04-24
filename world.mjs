@@ -49,9 +49,6 @@ export function generateWorld(hex_layout)
 
     function bfs(h, subgraph)
     {
-        // console.log("searching " + h);
-        // console.log(heightmap.get(h.toString()));
-        // console.log(watermap.get(h.toString()));
         // edge cases: out of bounds, been examined already, is water
         if (! heightmap.has(h.toString()))
             return subgraph;
@@ -89,20 +86,23 @@ export function generateWorld(hex_layout)
         }
     }
 
-    console.log(spiral.length);
-    console.log(largest_subgraph_length);
+    var largest_subgraph = subgraphs[largest_subgraph_index];
 
-    // make the centre of gravity the centre of the screen
+    // make the centre of gravity into the origin
     var centre_of_gravity = new hexLib.Hex(0,0,0);
-    subgraphs[largest_subgraph_index].forEach(function(h)
+    largest_subgraph.forEach(function(h)
     {
         centre_of_gravity = hexLib.hex_add(centre_of_gravity, h);
     });
     var translate = hexLib.hex_round(hexLib.hex_scale(centre_of_gravity, 1/largest_subgraph_length));
 
+
+    var largest_subgraph_ids = largest_subgraph.map(h => h.toString());
+    var filtered_spiral = spiral.filter(h => largest_subgraph_ids.includes(h.toString()));
+
     // return centered landmass
     var world = [];
-    subgraphs[largest_subgraph_index].forEach(function(h)
+    filtered_spiral.forEach(function(h)
     {
         var new_h = hexLib.hex_subtract(h, translate);
         world.push(new_h);
