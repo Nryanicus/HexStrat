@@ -7,7 +7,7 @@ export function generateWorld(hex_layout)
     const simplex_zoom1 = 128;
     const simplex_zoom2 = 512;
     const simplex_ratio = 0.4;
-    const world_size = 20.0;
+    const world_size = 35.0;
     var heightmap = new Map(); // Hex.toString() to z
     var watermap = new Map(); // Hex.toString() to bool, true for water
 
@@ -38,10 +38,9 @@ export function generateWorld(hex_layout)
 
     spiral.forEach(function(h)
     {
-        var p = hexLib.hex_to_pixel(hex_layout, h);
         var z = heightmap.get(h.toString()) - min_height;
         var r = z/max_height;
-        var is_water = (r < 0.5);
+        var is_water = (r > 0.5);
         watermap.set(h.toString(), is_water);
     });
 
@@ -59,7 +58,7 @@ export function generateWorld(hex_layout)
         if (searched_hex_sprites.has(h.toString()))
             return subgraph;
         searched_hex_sprites.add(h.toString());
-        if (watermap.get(h.toString()))
+        if (!watermap.get(h.toString()))
             return subgraph;
 
         // base case: add current hex to subgraph, recurse to neighbours
