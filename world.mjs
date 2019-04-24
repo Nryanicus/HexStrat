@@ -4,8 +4,8 @@ import {range} from "./lib/misc.mjs";
 export function generateWorld(hex_layout)
 {
     // generate hex spiral with noisey heights
-    const simplex_zoom1 = 64;
-    const simplex_zoom2 = 256;
+    const simplex_zoom1 = 128;
+    const simplex_zoom2 = 512;
     const simplex_ratio = 0.4;
     const world_size = 20.0;
     var heightmap = new Map(); // Hex.toString() to z
