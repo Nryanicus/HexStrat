@@ -1,13 +1,14 @@
+'use strict';
+
 import * as hexLib from "./lib/hex-functions.mjs";
 import {range} from "./lib/misc.mjs";
 
-export function generateWorld(hex_layout)
+export function generateWorld(world_size, hex_layout)
 {
     // generate hex spiral with noisey heights
     const simplex_zoom1 = 128;
     const simplex_zoom2 = 512;
     const simplex_ratio = 0.4;
-    const world_size = 35.0;
     var heightmap = new Map(); // Hex.toString() to z
     var watermap = new Map(); // Hex.toString() to bool, true for water
 
