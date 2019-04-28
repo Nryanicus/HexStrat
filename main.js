@@ -21,6 +21,7 @@ var game = new Phaser.Game(config);
 var controls;
 
 const white = 0xffffff;
+const background = 0x00081f;
 
 const purple = 0x6110a2;
 const grey = 0x797979;
@@ -57,10 +58,11 @@ function create ()
     };
 
     controls = new Phaser.Cameras.Controls.FixedKeyControl(controlConfig);
+    this.cameras.main.setBackgroundColor(background);
 
     // world gen
     var hex_layout = hexLib.Layout(hexLib.layout_pointy, hexLib.Point(11.5,10.7), hexLib.Point(500,500));
-    const world_size = 20.0;
+    const world_size = 25.0;
     var world = [];
     var capitols = [];
     var hex_to_sprite = new Map();
@@ -130,9 +132,6 @@ function create ()
         var taken_positions = [];
         var attempts = 0;
 
-        console.log("players "+num_players);
-        console.log("min_dist "+min_dist);
-
         while (taken_positions.length != num_players)
         {
             // look for a spot
@@ -175,7 +174,6 @@ function create ()
         {
             var colour = available_colours.pop();
             taken_colours.push(colour);
-            console.log("player "+i+" is "+colour_names.get(colour))
         }
 
         // determine begining territories
@@ -227,7 +225,7 @@ function create ()
 
             var colour = taken_colours[i];
 
-            this.time.delayedCall(world.length+1000*i, function()
+            this.time.delayedCall(300+world.length+1000*i, function()
             {
 
                 var cam = this.cameras.main;
@@ -269,7 +267,7 @@ function create ()
                 to: 1,
                 ease: 'Linear',
                 duration: 100,
-                delay: world.length+1000*owner_id + d*100,
+                delay: 300+world.length+1000*owner_id + d*100,
                 onUpdate: function()
                 {
                     hex.setTint(lerpColour(white, taken_colours[owner_id], tween_map.get(string).getValue()));
@@ -280,7 +278,7 @@ function create ()
         }, this);
 
         // pan-zoom to centre
-        this.time.delayedCall(world.length+1000*(num_players-1) + max_d*100, function()
+        this.time.delayedCall(300+world.length+1000*(num_players-1) + max_d*100, function()
         {
             var cam = this.cameras.main;
             cam.pan(500, 500, 1000, "Linear");
