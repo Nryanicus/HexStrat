@@ -2,7 +2,7 @@
 
 import * as hexLib from "./lib/hex-functions.mjs";
 import {range, getRandomInt, shuffle, lerpColour} from "./lib/misc.mjs";
-import {generateWorld} from "./world.mjs";
+import {generateWorld, placeCapitols} from "./world.mjs";
 import {BinaryHeap} from "./lib/binaryHeap.mjs";
 import {aStar} from "./lib/aStar.mjs";
 
@@ -37,6 +37,9 @@ const colour_names = new Map([[0x6110a2, "purple"], [0x797979, "grey"], [0x79410
 
 function preload ()
 {
+    this.load.image('purchase', 'res/Purchase.png');
+    this.load.image('purchase_select', 'res/PurchaseSelection.png');
+    this.load.image('select', 'res/HexOutlineBlur.png');
     this.load.image('hex', 'res/Hex.png');
     this.load.image('capitol', 'res/Cap.png');
 }
@@ -63,14 +66,25 @@ function create ()
     // world gen
     var hex_layout = hexLib.Layout(hexLib.layout_pointy, hexLib.Point(11.5,10.7), hexLib.Point(500,500));
     const world_size = 25.0;
+    const num_players = world_size/5;
     var world = [];
     var capitols = [];
+    var territories;
+    var players = []; // {Hex, Colour}
     var hex_to_sprite = new Map();
+    var can_gen = true;
 
     // generateNewWorld.bind(this)();
 
     function generateNewWorld()
     {
+        if (! can_gen)
+            return;
+        can_gen = false;
+        controls.stop();
+        select.setVisible(false);
+        menu.setVisible(false);
+
         capitols.map(c => c.destroy());
         world.map(h => hex_to_sprite.get(h.toString()).destroy());
         hex_to_sprite.clear();
@@ -88,14 +102,6 @@ function create ()
             img.depth = depth - i;
             hex_to_sprite.set(h.toString(), img);
             img.setPosition(p.x, p.y);
-            img.setInteractive({ pixelPerfect: true });
-            img.setData('hex', h);
-            img.on('pointerdown', function (pointer) 
-            {
-                console.log(img.data.values.hex);
-                console.log(img.data.values.owner);
-                console.log("|===============|");
-            });
 
             this.tweens.add({
                 targets: img,
@@ -109,62 +115,9 @@ function create ()
             i++;
         }, this);   
 
-        // spawn starting locations
-        const num_players = world_size/5;
-
-        const min_dist = world_size/num_players;
-        
-        // all non-coastal locations are valid starting locations
-        var available_world = [];
-        world.forEach(function(h){
-            var no_water_neighbour = true;
-            hexLib.hex_ring(h, 1).forEach(function(n)
-            {
-                if (! world_string_set.has(n.toString()))
-                    no_water_neighbour = false;
-            });
-            if (no_water_neighbour)
-                available_world.push(h);
-        });
-
-        const available_world_original = available_world;
-
-        var taken_positions = [];
-        var attempts = 0;
-
-        while (taken_positions.length != num_players)
-        {
-            // look for a spot
-            var i = Math.floor(Math.random()*available_world.length);
-            // console.log(i);
-            var pos = available_world[ i ];
-            // console.log(pos);
-            taken_positions.push(pos);
-            var available_world_tmp = [];
-            available_world.forEach(function(h)
-            {
-                var dist = aStar(pos, h, world_string_set).length;
-                if (dist > min_dist)
-                    available_world_tmp.push(h);
-            }); 
-            available_world = available_world_tmp;
-            // if we can't place all players try again from the top, with a limit of the number of times we attempt
-            if (available_world.length < num_players-i)
-            {
-                // console.log(i);
-                // console.log(taken_positions);
-                i = 0;
-                // console.log(i);
-                taken_positions = [];
-                available_world = available_world_original;
-                attempts++;
-                if (attempts == 1000)
-                {
-                    console.log("failure");
-                    return;
-                }
-            }
-        }
+        // spawn starting locations and determine begining territories
+        var taken_positions;
+        [taken_positions, territories] = placeCapitols(world, world_string_set, world_size, num_players);
 
         // assign colours
         var available_colours = [purple, grey, brown, cream, light_blue, yellow, pink, orange, deep_pink, green];;
@@ -176,40 +129,8 @@ function create ()
             taken_colours.push(colour);
         }
 
-        // determine begining territories
-        var world_owners = new Map(); // Hex.toString() => int
-        world.forEach(function(h)
-        {
-            var bh = new BinaryHeap();
-            for (var i = 0; i < num_players; i++) 
-            {
-                var p = taken_positions[i];
-                var d = aStar(h, p, world_string_set).length;
-                bh.insert(d, i);
-            }
-            var min_dist_player = -1;
-            var closest = bh.extractMinimum();
-            var second_closest = bh.extractMinimum();
-            // if the two closest capitols are equidistant than the hex is neutral
-            if (closest.key != second_closest.key) 
-                min_dist_player = closest.value;
-
-            world_owners.set(h.toString(), min_dist_player);
-            var s = hex_to_sprite.get(h.toString());
-            if (min_dist_player != -1)
-            {
-                // s.setTint(taken_colours[min_dist_player]);
-                s.setData('owner', colour_names.get(taken_colours[min_dist_player]));
-                s.setData('owner_id', min_dist_player);
-            }
-            else
-            {
-                s.setData('owner', "none");
-                s.setData('owner_id', -1);
-            }
-        });
-
         // pan-zoom to each capitol
+        // store player capitol hex and colour
         var i = 0;
         taken_positions.forEach(function(h)
         {
@@ -224,6 +145,7 @@ function create ()
             capitols.push(img);
 
             var colour = taken_colours[i];
+            players.push({capitol: h, colour: taken_colours[i]});
 
             this.time.delayedCall(300+world.length+1000*i, function()
             {
@@ -254,7 +176,7 @@ function create ()
         var tween_map = new Map();
         hex_to_sprite.forEach(function(hex, string, map)
         {
-            var owner_id = hex.data.values.owner_id;
+            var owner_id = territories.get(string);
             if (owner_id == -1)
                 return;
 
@@ -283,12 +205,47 @@ function create ()
             var cam = this.cameras.main;
             cam.pan(500, 500, 1000, "Linear");
             cam.zoomTo(1.5, 1000, "Linear");
+            controls.start();
+            select.setVisible(true);
+            can_gen = true;
         }, [], this);
     }
 
-    this.input.keyboard.on('keydown_Z', function (event) {
+    this.input.keyboard.on('keydown_Z', function (event) 
+    {
         generateNewWorld.bind(this)();
     }, this);
+
+    var select = this.add.image(0, 0, 'select');
+    select.depth = 999999;
+    select.setVisible(false);
+    this.input.on('pointermove', function (pointer) 
+    {
+        var p = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+        var h = hexLib.hex_round(hexLib.pixel_to_hex(hex_layout, p));
+        p = hexLib.hex_to_pixel(hex_layout, h);
+        select.setPosition(p.x, p.y);
+    }, this);
+
+
+    // recruitment
+    var menu = this.add.image(0, 0, 'purchase');
+    menu.depth = 999999;
+    menu.setVisible(false);
+
+
+    this.input.on('pointerdown', function (pointer) 
+    {
+        var player_cap = players[0].capitol.toString();
+        var p = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+        var h = hexLib.hex_round(hexLib.pixel_to_hex(hex_layout, p));
+        if (h.toString() == player_cap)
+        {
+            men.setVisible = true;
+        }
+
+    }, this);
+
 }
 
 

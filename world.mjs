@@ -2,6 +2,8 @@
 
 import * as hexLib from "./lib/hex-functions.mjs";
 import {range} from "./lib/misc.mjs";
+import {aStar} from "./lib/aStar.mjs";
+import {BinaryHeap} from "./lib/binaryHeap.mjs";
 
 export function generateWorld(world_size, hex_layout)
 {
@@ -109,4 +111,83 @@ export function generateWorld(world_size, hex_layout)
         world.push(new_h);
     });
     return world;
+}
+
+export function placeCapitols(world, world_string_set, world_size, num_players)
+{
+    const min_dist = world_size/num_players;
+    
+    // all non-coastal locations are valid starting locations
+    var available_world = [];
+    world.forEach(function(h){
+        var no_water_neighbour = true;
+        hexLib.hex_ring(h, 1).forEach(function(n)
+        {
+            if (! world_string_set.has(n.toString()))
+                no_water_neighbour = false;
+        });
+        if (no_water_neighbour)
+            available_world.push(h);
+    });
+
+    const available_world_original = available_world;
+
+    var taken_positions = [];
+    var attempts = 0;
+
+    while (taken_positions.length != num_players)
+    {
+        // look for a spot
+        var i = Math.floor(Math.random()*available_world.length);
+        // console.log(i);
+        var pos = available_world[ i ];
+        // console.log(pos);
+        taken_positions.push(pos);
+        var available_world_tmp = [];
+        available_world.forEach(function(h)
+        {
+            var dist = aStar(pos, h, world_string_set).length;
+            if (dist > min_dist)
+                available_world_tmp.push(h);
+        }); 
+        available_world = available_world_tmp;
+        // if we can't place all players try again from the top, with a limit of the number of times we attempt
+        if (available_world.length < num_players-i)
+        {
+            // console.log(i);
+            // console.log(taken_positions);
+            i = 0;
+            // console.log(i);
+            taken_positions = [];
+            available_world = available_world_original;
+            attempts++;
+            if (attempts == 1000)
+            {
+                console.log("failure");
+                return;
+            }
+        }
+    }
+
+    var territories = new Map(); // Hex.toString() => int
+    world.forEach(function(h)
+    {
+        var bh = new BinaryHeap();
+        for (var i = 0; i < num_players; i++) 
+        {
+            var p = taken_positions[i];
+            var d = aStar(h, p, world_string_set).length;
+            bh.insert(d, i);
+        }
+        var min_dist_player = -1;
+        var closest = bh.extractMinimum();
+        var second_closest = bh.extractMinimum();
+        // if the two closest capitols are equidistant than the hex is neutral
+        if (closest.key != second_closest.key) 
+            min_dist_player = closest.value;
+
+        territories.set(h.toString(), min_dist_player);
+    });
+
+    return [taken_positions, territories];
 }
