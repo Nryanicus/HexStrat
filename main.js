@@ -6,6 +6,8 @@ import {generateWorld, placeCapitols} from "./world.mjs";
 import {BinaryHeap} from "./lib/binaryHeap.mjs";
 import {aStar} from "./lib/aStar.mjs";
 
+const background = 0x00081f;
+
 var config = {
     type: Phaser.AUTO,
     width: window.innerWidth,
@@ -14,6 +16,11 @@ var config = {
         preload: preload,
         create: create,
         update: update
+    },
+    backgroundColor: background,
+    render: {
+        antialias: false,
+        roundPixels: true,
     }
 };
 
@@ -21,7 +28,6 @@ var game = new Phaser.Game(config);
 var controls;
 
 const white = 0xffffff;
-const background = 0x00081f;
 
 const purple = 0x6110a2;
 const grey = 0x797979;
@@ -37,11 +43,17 @@ const colour_names = new Map([[0x6110a2, "purple"], [0x797979, "grey"], [0x79410
 
 function preload ()
 {
+    this.load.image('reference', 'res/Reference.png');
     this.load.image('purchase', 'res/Purchase.png');
     this.load.image('purchase_select', 'res/PurchaseSelection.png');
-    this.load.image('select', 'res/HexOutlineBlur.png');
+    this.load.image('hex_select', 'res/HexOutlineBlur.png');
     this.load.image('hex', 'res/Hex.png');
     this.load.image('capitol', 'res/Cap.png');
+
+    this.load.image('sword', 'res/Sword.png');
+    this.load.image('spear', 'res/Spear.png');
+    this.load.image('cavalry', 'res/Cav.png');
+    this.load.image('ranged', 'res/Ranged.png');
 }
 
 function create ()
@@ -61,20 +73,19 @@ function create ()
     };
 
     controls = new Phaser.Cameras.Controls.FixedKeyControl(controlConfig);
-    this.cameras.main.setBackgroundColor(background);
 
     // world gen
     var hex_layout = hexLib.Layout(hexLib.layout_pointy, hexLib.Point(11.5,10.7), hexLib.Point(500,500));
-    const world_size = 25.0;
+    const world_size = 10.0;
     const num_players = world_size/5;
     var world = [];
+    var units = [];
+    var world_string_set;
     var capitols = [];
     var territories;
     var players = []; // {Hex, Colour}
     var hex_to_sprite = new Map();
     var can_gen = true;
-
-    // generateNewWorld.bind(this)();
 
     function generateNewWorld()
     {
@@ -82,15 +93,17 @@ function create ()
             return;
         can_gen = false;
         controls.stop();
-        select.setVisible(false);
+        hex_select.setVisible(false);
         menu.setVisible(false);
 
+        units.map(c => c.destroy());
         capitols.map(c => c.destroy());
         world.map(h => hex_to_sprite.get(h.toString()).destroy());
         hex_to_sprite.clear();
 
-        world = generateWorld(world_size, hex_layout);
-        var world_string_set = new Set( world.map(x => x.toString()) );
+        while (world.length < num_players*world_size)
+            world = generateWorld(world_size, hex_layout);
+        world_string_set = new Set( world.map(x => x.toString()) );
         var i = 0;
         var depth = world.length;
         world.forEach(function(h)
@@ -152,10 +165,10 @@ function create ()
 
                 var cam = this.cameras.main;
                 cam.pan(p.x, p.y, 333, "Expo");
-                cam.zoomTo(3, 400, "Cubic");
+                cam.zoomTo(4, 400, "Cubic");
                 this.time.delayedCall(400, function()
                 {
-                    cam.zoomTo(2, 400, "Linear");
+                    cam.zoomTo(3, 400, "Linear");
                 }, [], this);
 
                 this.tweens.add({
@@ -204,9 +217,8 @@ function create ()
         {
             var cam = this.cameras.main;
             cam.pan(500, 500, 1000, "Linear");
-            cam.zoomTo(1.5, 1000, "Linear");
             controls.start();
-            select.setVisible(true);
+            hex_select.setVisible(true);
             can_gen = true;
         }, [], this);
     }
@@ -216,36 +228,162 @@ function create ()
         generateNewWorld.bind(this)();
     }, this);
 
-    var select = this.add.image(0, 0, 'select');
-    select.depth = 999999;
-    select.setVisible(false);
+
+
+    // control vars
+    var unit_to_place;
+    var is_placing_unit = 0;
+
+    // hex cursor
+    var hex_select = this.add.image(0, 0, 'hex_select');
+    hex_select.setAlpha(0.75);
+    this.tweens.add({
+        targets: hex_select,
+        ease: 'Linear',
+        duration: 600,
+        repeat: -1,
+        yoyo: true,
+        alpha: 1
+    });
+    hex_select.depth = 999999;
+    hex_select.setVisible(false);
     this.input.on('pointermove', function (pointer) 
     {
         var p = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
         var h = hexLib.hex_round(hexLib.pixel_to_hex(hex_layout, p));
+        if (!world_string_set.has(h.toString()))
+            return
         p = hexLib.hex_to_pixel(hex_layout, h);
-        select.setPosition(p.x, p.y);
+        hex_select.setPosition(p.x, p.y);
+
+        if (is_placing_unit > 0)
+        {
+            unit_to_place.setPosition(p.x, p.y);
+        }
     }, this);
 
 
     // recruitment
-    var menu = this.add.image(0, 0, 'purchase');
+    var menu = this.add.container(0, 0)
+    menu.setSize(96, 78);
+    menu.setInteractive();
+    var menu_background = this.add.image(-35, 0, 'purchase');
+    var reference = this.add.image(11, 0, 'reference');
+
+    var sword = this.add.image(-35, -24, 'sword').setInteractive({pixelPerfect:true});
+    var spear = this.add.image(-35, -8, 'spear').setInteractive({pixelPerfect:true});
+    var cavalry = this.add.image(-35, 8, 'cavalry').setInteractive({pixelPerfect:true});
+    var ranged = this.add.image(-35, 24, 'ranged').setInteractive({pixelPerfect:true});
+    var purchase_select = this.add.image(0,0, 'purchase_select');
+
+    menu.add([menu_background, reference, purchase_select, sword, spear, cavalry, ranged]);
+
+    reference.setVisible(false);
     menu.depth = 999999;
     menu.setVisible(false);
+    menu.setActive(false);
+    purchase_select.setVisible(false);
+    purchase_select.setAlpha(0.75);
+    this.tweens.add({
+        targets: purchase_select,
+        ease: 'Linear',
+        duration: 600,
+        repeat: -1,
+        yoyo: true,
+        alpha: 1
+    });
 
+    var menu_state = 0;
 
-    this.input.on('pointerdown', function (pointer) 
+    function close_menu()
+    {
+        menu_state = 0;
+        menu.setVisible(false);
+        reference.setVisible(false);
+        menu.setActive(false);
+        purchase_select.setVisible(false);
+        hex_select.setVisible(true);
+    }
+
+    var unit_options = [sword, spear, cavalry, ranged];
+    var unit_map = new Map([[sword,"sword"], [cavalry,"cavalry"], [spear,"spear"], [ranged,"ranged"]]);
+    [sword, spear, cavalry, ranged, menu].forEach(function(img)
+    {
+        img.on('pointerdown', function(event)
+        {
+            if (unit_options.includes(img))
+            {
+                close_menu();
+
+                var p = this.cameras.main.getWorldPoint(event.x, event.y);
+                var h = hexLib.hex_round(hexLib.pixel_to_hex(hex_layout, p));
+                p = hexLib.hex_to_pixel(hex_layout, h);
+
+                unit_to_place = this.add.image(p.x, p.y, unit_map.get(img));
+                unit_to_place.depth = 90000;
+                units.push(unit_to_place);
+                is_placing_unit = 2;
+            }
+            else
+                menu_state++;
+
+        }, this);
+        img.on('pointerover', function(event)
+        {
+            hex_select.setVisible(false);
+            if (unit_options.includes(img))
+            {
+                purchase_select.setVisible(true);
+                var p = img.getCenter();
+                purchase_select.setPosition(p.x, p.y);
+            }
+        }, this);
+        img.on('pointerout', function(event)
+        {
+            hex_select.setVisible(true);
+            purchase_select.setVisible(false);
+        }, this);
+    }, this);
+
+    this.input.on('pointerdown', function (pointer, gameobjects) 
     {
         var player_cap = players[0].capitol.toString();
         var p = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
         var h = hexLib.hex_round(hexLib.pixel_to_hex(hex_layout, p));
         if (h.toString() == player_cap)
         {
-            men.setVisible = true;
+            menu_background.setTint(players[0].colour);
+            reference.setTint(players[0].colour);
+            menu_state++;
+            if (menu_state == 1)
+            {
+                console.log("show menu");
+                menu.setVisible(true);
+                menu.setActive(true);
+                var m_p = hexLib.hex_to_pixel(hex_layout, hexLib.hex_add(h, new hexLib.Hex(1,0,0)));
+                menu.setPosition(m_p.x+38, m_p.y-1);
+            }
+            if (menu_state > 1)
+            {
+                console.log("show ref");
+                reference.setVisible(true);
+            }
+        }
+        else
+        {
+            // don't cancel menu if we're in the menu
+            if (gameobjects.includes(menu))
+                return;
+            close_menu();
+            if (is_placing_unit > 0)
+                is_placing_unit--;
         }
 
     }, this);
 
+
+    // start
+    generateNewWorld.bind(this)();
 }
 
 
