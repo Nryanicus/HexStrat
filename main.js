@@ -4,7 +4,7 @@ import * as hexLib from "./lib/hex-functions.mjs";
 import {range, getRandomInt, shuffle, lerpColour} from "./lib/misc.mjs";
 import {generateWorld, placeCapitols} from "./world.mjs";
 import {BinaryHeap} from "./lib/binaryHeap.mjs";
-import {aStar} from "./lib/aStar.mjs";
+import {aStar, clearCache} from "./lib/aStar.mjs";
 
 const background = 0x00081f;
 
@@ -48,6 +48,7 @@ function preload ()
     this.load.image('purchase_select', 'res/PurchaseSelection.png');
     this.load.image('hex_select', 'res/HexOutlineBlur.png');
     this.load.image('hex', 'res/Hex.png');
+    this.load.image('hex_flat', 'res/HexFlat.png');
     this.load.image('capitol', 'res/Cap.png');
 
     this.load.image('sword', 'res/Sword.png');
@@ -85,6 +86,7 @@ function create ()
     var territories;
     var players = []; // {Hex, Colour}
     var hex_to_sprite = new Map();
+    var occupied = new Map();
     var can_gen = true;
 
     function generateNewWorld()
@@ -96,12 +98,18 @@ function create ()
         hex_select.setVisible(false);
         menu.setVisible(false);
 
+        clearCache();
+        players = [];
         units.map(c => c.destroy());
+        occupied.clear();
+        units = [];
         capitols.map(c => c.destroy());
+        capitols = [];
         world.map(h => hex_to_sprite.get(h.toString()).destroy());
+        world = [];
         hex_to_sprite.clear();
 
-        while (world.length < num_players*world_size)
+        while (world.length < num_players*world_size*2)
             world = generateWorld(world_size, hex_layout);
         world_string_set = new Set( world.map(x => x.toString()) );
         var i = 0;
@@ -228,11 +236,9 @@ function create ()
         generateNewWorld.bind(this)();
     }, this);
 
-
-
     // control vars
     var unit_to_place;
-    var is_placing_unit = 0;
+    var is_placing_unit = false;
 
     // hex cursor
     var hex_select = this.add.image(0, 0, 'hex_select');
@@ -247,6 +253,7 @@ function create ()
     });
     hex_select.depth = 999999;
     hex_select.setVisible(false);
+    hex_select.setBlendMode(Phaser.BlendModes.ADD);
     this.input.on('pointermove', function (pointer) 
     {
         var p = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
@@ -256,9 +263,9 @@ function create ()
         p = hexLib.hex_to_pixel(hex_layout, h);
         hex_select.setPosition(p.x, p.y);
 
-        if (is_placing_unit > 0)
+        if (is_placing_unit)
         {
-            unit_to_place.setPosition(p.x, p.y);
+            unit_to_place.setPosition(p.x, p.y-2);
         }
     }, this);
 
@@ -268,7 +275,7 @@ function create ()
     menu.setSize(96, 78);
     menu.setInteractive();
     var menu_background = this.add.image(-35, 0, 'purchase');
-    var reference = this.add.image(11, 0, 'reference');
+    var reference = this.add.image(14, 0, 'reference');
 
     var sword = this.add.image(-35, -24, 'sword').setInteractive({pixelPerfect:true});
     var spear = this.add.image(-35, -8, 'spear').setInteractive({pixelPerfect:true});
@@ -284,6 +291,7 @@ function create ()
     menu.setActive(false);
     purchase_select.setVisible(false);
     purchase_select.setAlpha(0.75);
+    purchase_select.setBlendMode(Phaser.BlendModes.ADD);
     this.tweens.add({
         targets: purchase_select,
         ease: 'Linear',
@@ -319,10 +327,47 @@ function create ()
                 var h = hexLib.hex_round(hexLib.pixel_to_hex(hex_layout, p));
                 p = hexLib.hex_to_pixel(hex_layout, h);
 
-                unit_to_place = this.add.image(p.x, p.y, unit_map.get(img));
+                unit_to_place = this.add.image(p.x, p.y-2, unit_map.get(img));
                 unit_to_place.depth = 90000;
                 units.push(unit_to_place);
-                is_placing_unit = 2;
+                is_placing_unit = true;
+                var flats = [];
+
+                hexLib.hex_ring(players[0].capitol, 1).forEach(function(h)
+                {
+                    if (occupied.has(h.toString()))
+                        return;
+                    p = hexLib.hex_to_pixel(hex_layout, h);
+                    var flat = this.add.image(p.x, p.y, 'hex_flat').setInteractive({pixelPerfect:true});
+                    flat.depth = 90001;
+                    flat.setBlendMode(Phaser.BlendModes.ADD);
+                    flat.on('pointerdown', function(event)
+                    {
+                        p = this.cameras.main.getWorldPoint(event.x, event.y);
+                        h = hexLib.hex_round(hexLib.pixel_to_hex(hex_layout, p));
+                        occupied.set(h.toString(), true);
+                        is_placing_unit = false;
+                        flats.map(f => f.destroy());
+                        this.tweens.add({
+                            targets: unit_to_place,
+                            ease: 'Back',
+                            easeParams: [4.5],
+                            y: "+=2",
+                            duration: 60
+                        });
+                    }, this);
+                    flat.setAlpha(0.01);
+                    this.tweens.add({
+                        targets: flat,
+                        ease: 'Linear',
+                        duration: 600,
+                        repeat: -1,
+                        yoyo: true,
+                        alpha: 0.25
+                    });
+                    flats.push(flat);
+                }, this);
+
             }
             else
                 menu_state++;
@@ -357,7 +402,6 @@ function create ()
             menu_state++;
             if (menu_state == 1)
             {
-                console.log("show menu");
                 menu.setVisible(true);
                 menu.setActive(true);
                 var m_p = hexLib.hex_to_pixel(hex_layout, hexLib.hex_add(h, new hexLib.Hex(1,0,0)));
@@ -365,7 +409,6 @@ function create ()
             }
             if (menu_state > 1)
             {
-                console.log("show ref");
                 reference.setVisible(true);
             }
         }
@@ -375,8 +418,6 @@ function create ()
             if (gameobjects.includes(menu))
                 return;
             close_menu();
-            if (is_placing_unit > 0)
-                is_placing_unit--;
         }
 
     }, this);
