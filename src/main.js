@@ -8,7 +8,7 @@ var config = {
     type: Phaser.AUTO,
     width: window.innerWidth,
     height: window.innerHeight,
-    scene: [WorldScene, MasterScene],
+    scene: [WorldScene],
     backgroundColor: background,
     render: { // todo experiment with pixel art setting
         antialias: false,

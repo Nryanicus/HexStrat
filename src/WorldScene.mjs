@@ -5,6 +5,7 @@ import {range, shuffle, lerpColour} from "./misc/utilities.mjs";
 import {aStar, clearCache} from "./misc/aStar.mjs";
 import {BinaryHeap} from "../../lib/binaryHeap.mjs";
 import {hex_layout, player_colours, white} from "./misc/constants.mjs";
+import {Unit} from "./Unit.mjs";
 
 export function generateWorld(world_size)
 {
@@ -201,7 +202,7 @@ export class WorldScene extends Phaser.Scene
         super("world");
         this.camera_controls;
         this.can_gen = false;
-        this.has_ui = false;
+        this.occupied = new Map();
     }
 
     preload()
@@ -379,14 +380,15 @@ export class WorldScene extends Phaser.Scene
             this.player_capitol_hex = taken_positions[0];
             this.player_colour = taken_colours[0];
             this.world_string_set = world_string_set;
-            this.setUpUI();
+            this.initUI();
         }, [], this);
     }
 
-    setUpUI()
+    initUI()
     {
         // control vars
         var unit_to_place;
+        var flats = [];
         var is_placing_unit = false;
 
         // hex cursor
@@ -474,27 +476,27 @@ export class WorldScene extends Phaser.Scene
                     var p = this.cameras.main.getWorldPoint(event.x, event.y);
                     var h = hexLib.hex_round(hexLib.pixel_to_hex(hex_layout, p));
                     p = hexLib.hex_to_pixel(hex_layout, h);
-
-                    unit_to_place = this.add.image(p.x, p.y-2, unit_map.get(img));
-                    unit_to_place.depth = 90000;
+                    unit_to_place = this.add.existing(new Unit(this, p.x, p.y-2, unit_map.get(img), h, this.occupied, this.world_string_set));
+                    unit_to_place.depth = 80000;
                     is_placing_unit = true;
-                    var flats = [];
 
                     hexLib.hex_ring(this.player_capitol_hex, 1).forEach(function(h)
                     {
-                        if (occupied.has(h.toString()))
+                        if (this.occupied.has(h.toString()))
                             return;
                         p = hexLib.hex_to_pixel(hex_layout, h);
                         var flat = this.add.image(p.x, p.y, 'hex_flat').setInteractive({pixelPerfect:true});
                         flat.depth = 90001;
                         flat.setBlendMode(Phaser.BlendModes.ADD);
-                        flat.on('pointerdown', function(event)
+                        flat.on('pointerdown', function(pointer, localx, localy, event)
                         {
-                            p = this.cameras.main.getWorldPoint(event.x, event.y);
+                            p = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
                             h = hexLib.hex_round(hexLib.pixel_to_hex(hex_layout, p));
-                            occupied.set(h.toString(), true);
+                            unit_to_place.hex = h;
+                            this.occupied.set(h.toString(), unit_to_place);
                             is_placing_unit = false;
                             flats.map(f => f.destroy());
+                            flats = [];
                             this.tweens.add({
                                 targets: unit_to_place,
                                 ease: 'Back',
@@ -502,6 +504,7 @@ export class WorldScene extends Phaser.Scene
                                 y: "+=2",
                                 duration: 60
                             });
+                            event.stopPropagation();
                         }, this);
                         flat.setAlpha(0.01);
                         this.tweens.add({
@@ -542,7 +545,7 @@ export class WorldScene extends Phaser.Scene
             var player_cap = this.player_capitol_hex.toString();
             var p = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
             var h = hexLib.hex_round(hexLib.pixel_to_hex(hex_layout, p));
-            if (h.toString() == player_cap)
+            if (h.toString() == player_cap && ! is_placing_unit)
             {
                 menu_background.setTint(this.player_colour);
                 reference.setTint(this.player_colour);
@@ -565,6 +568,53 @@ export class WorldScene extends Phaser.Scene
                 if (gameobjects.includes(menu))
                     return;
                 close_menu();
+
+                if (this.occupied.has(h.toString()))
+                {
+                    var unit = this.occupied.get(h.toString());
+                    var handle_return = unit.handlePointerDown(this.occupied, this.world_string_set);
+                    if (handle_return.is_moving)
+                    {
+                        unit_to_place = this.add.image(p.x, p.y-2, unit.type);
+                        unit_to_place.setAlpha(0.5);
+                        is_placing_unit = true;
+
+                        handle_return.possible_destinations.forEach(function(h)
+                        {
+                            p = hexLib.hex_to_pixel(hex_layout, h);
+                            var flat = this.add.image(p.x, p.y, 'hex_flat').setInteractive({pixelPerfect:true});
+                            flat.depth = 90001;
+                            flat.setBlendMode(Phaser.BlendModes.ADD);
+                            flat.on('pointerdown', function(event)
+                            {
+                                p = this.cameras.main.getWorldPoint(event.x, event.y);
+                                h = hexLib.hex_round(hexLib.pixel_to_hex(hex_layout, p));
+                                p = hexLib.hex_to_pixel(hex_layout, h);
+                                this.occupied.set(h.toString(), unit);
+                                is_placing_unit = false;
+                                unit_to_place.destroy();
+                                flats.map(f => f.destroy());
+                                flats = [];
+
+                                // todo, lerp into position along path
+                                // grey out after move
+                                // have attack anim and UI
+                                unit.updatePosition(p.x, p.y, h);
+                            }, this);
+                            flat.setAlpha(0.01);
+                            this.tweens.add({
+                                targets: flat,
+                                ease: 'Linear',
+                                duration: 600,
+                                repeat: -1,
+                                yoyo: true,
+                                alpha: 0.25
+                            });
+                            flats.push(flat);
+                        }, this);
+                    }
+
+                }
             }
         }, this);
     }
