@@ -171,15 +171,31 @@ export function placeCapitols(world, world_string_set, world_size, num_players)
         }
     }
 
+    var players = [];
+    for (var i = 0; i < num_players; i++)
+        players.push([taken_positions[i]]);
+    var territories = determineTerritories(world, players, world_string_set);
+
+    return [taken_positions, territories];
+}
+
+// world : iterable of Hex, [Hex]
+// players : array of array of hex, [[Hex]]. i.e a list of a list of each players' positions
+// returns map of Hex to int, the owning player's index. With -1 for neutral hexes
+export function determineTerritories(world, players, world_string_set)
+{
     var territories = new Map(); // Hex.toString() => int
     world.forEach(function(h)
     {
         var bh = new BinaryHeap();
-        for (var i = 0; i < num_players; i++) 
+        for (var i = 0; i < players.length; i++) 
         {
-            var p = taken_positions[i];
-            var d = aStar(h, p, world_string_set).length;
-            bh.insert(d, i);
+            for (var j = 0; j < players[i].length; j++) 
+            {
+                var p = players[i][j];
+                var d = aStar(h, p, world_string_set).length;
+                bh.insert(d, i);
+            }
         }
         var min_dist_player = -1;
         var closest = bh.extractMinimum();
@@ -191,5 +207,5 @@ export function placeCapitols(world, world_string_set, world_size, num_players)
         territories.set(h.toString(), min_dist_player);
     });
 
-    return [taken_positions, territories];
+    return territories;
 }

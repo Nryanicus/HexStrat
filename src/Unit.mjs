@@ -1,24 +1,29 @@
+import {black} from "./misc/constants.mjs";
 import {aStar} from "./misc/aStar.mjs";
 import * as hexLib from "./misc/hex-functions.mjs";
 
 export class Unit extends Phaser.GameObjects.Image 
 {
 
-    constructor (scene, x, y, type, hex, occupied, world_string_set)
+    constructor (scene, x, y, type, hex, owner_id, occupied, world_string_set)
     {
         super(scene, x, y);
 
         this.scene = scene;
-        this.type = type;
         this.setTexture(type);
         this.setPosition(x, y);
+        this.setTint(black);
+
+        this.owner_id = owner_id;
+        this.type = type;
         this.hex = hex;
-        this.can_move = true;
+        this.can_move = type != "capitol";
 
         this.occupied = occupied;
         this.world_string_set = world_string_set;
 
         this.move_range = 3;
+
     }
 
     handlePointerDown()
@@ -29,7 +34,7 @@ export class Unit extends Phaser.GameObjects.Image
 
         this.occupied.delete(this.hex.toString());
 
-        var possible_destinations = [];
+        var possible_destinations = [this.hex];
         hexLib.hex_spiral(this.hex, this.move_range+1).forEach(function(h)
         {
             if (! this.world_string_set.has(h.toString()) || this.occupied.has(h.toString()))
@@ -45,5 +50,13 @@ export class Unit extends Phaser.GameObjects.Image
     {
         this.hex = hex;
         this.setPosition(x, y);
+    }
+
+    moveTo(h)
+    {
+        this.can_move = h == this.hex;
+        var path = aStar(this.hex, h, this.world_string_set);
+        this.hex = h;
+        return path.reverse();
     }
 }
