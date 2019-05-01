@@ -30,7 +30,7 @@ export class Unit extends Phaser.GameObjects.Image
         this.occupied.delete(this.hex.toString());
 
         var possible_destinations = [];
-        hexLib.hex_spiral(this.hex, this.move_range+2).forEach(function(h)
+        hexLib.hex_spiral(this.hex, this.move_range+1).forEach(function(h)
         {
             if (! this.world_string_set.has(h.toString()) || this.occupied.has(h.toString()))
                 return;

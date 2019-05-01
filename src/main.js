@@ -1,7 +1,6 @@
 'use strict';
 
 import {WorldScene} from "./WorldScene.mjs";
-import {MasterScene} from "./MasterScene.mjs";
 import {background} from "./misc/constants.mjs";
 
 var config = {
