@@ -174,9 +174,10 @@ export function placeCapitols(world, world_string_set, world_size, num_players)
     var players = [];
     for (var i = 0; i < num_players; i++)
         players.push([taken_positions[i]]);
-    var territories = determineTerritories(world, players, world_string_set);
+    var territories, closest_units;
+    [territories, closest_units] = determineTerritories(world, players, world_string_set);
 
-    return [taken_positions, territories];
+    return [taken_positions, territories, closest_units];
 }
 
 // world : iterable of Hex, [Hex]
@@ -185,27 +186,29 @@ export function placeCapitols(world, world_string_set, world_size, num_players)
 export function determineTerritories(world, players, world_string_set)
 {
     var territories = new Map(); // Hex.toString() => int
+    var closest_units = new Map();
     world.forEach(function(h)
     {
         var bh = new BinaryHeap();
-        for (var i = 0; i < players.length; i++) 
+        for (var i=0; i<players.length; i++) 
         {
-            for (var j = 0; j < players[i].length; j++) 
+            for (var j=0; j<players[i].length; j++) 
             {
                 var p = players[i][j];
                 var d = aStar(h, p, world_string_set).length;
-                bh.insert(d, i);
+                bh.insert(d, {unit_p: p, player: i});
             }
         }
         var min_dist_player = -1;
         var closest = bh.extractMinimum();
         var second_closest = bh.extractMinimum();
-        // if the two closest capitols are equidistant than the hex is neutral
-        if (closest.key != second_closest.key) 
-            min_dist_player = closest.value;
+        // if the two closest units are equidistant and not on the same side then the hex is neutral
+        if (! (closest.key == second_closest.key && closest.value.player != second_closest.value.player))
+            min_dist_player = closest.value.player;
 
+        closest_units.set(h.toString(), closest.value.unit_p); // doesn't matter if it's a neutral hex or not here, since it's just for graphics
         territories.set(h.toString(), min_dist_player);
     });
 
-    return territories;
+    return [territories, closest_units];
 }

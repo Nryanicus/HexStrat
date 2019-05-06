@@ -21,7 +21,7 @@ export class WorldScene extends Phaser.Scene
         this.world;
         this.world_string_set;
         this.territories;
-        this.previous_territories = new Map();
+        this.closest_units;
         this.capitol_positions;
         this.player_colours;
     }
@@ -80,15 +80,11 @@ export class WorldScene extends Phaser.Scene
         this.hex_to_sprite.forEach(function(hex, string, map)
         {
             var owner_id = this.territories.get(string);
-            if (owner_id == -1 || owner_id == this.previous_territories.get(string))
-                return;
-
-            // todo, have ripple from the closest unit instead of cap
-            var d = aStar(hexLib.Hex.prototype.fromString(string), this.capitol_positions[owner_id], this.world_string_set).length;
+            var d = aStar(hexLib.Hex.prototype.fromString(string), this.closest_units.get(string), this.world_string_set).length;
 
             max_d = d > max_d ? d : max_d;
             var col1 = hex.isTinted ? hex.tint : white;
-            var col2 = this.player_colours[owner_id];
+            var col2 = owner_id != -1 ? this.player_colours[owner_id] : white;
             var initdelay = 0;
             if (initial_delay)
                 initdelay = 300+this.world.length+1000*owner_id;
@@ -117,6 +113,8 @@ export class WorldScene extends Phaser.Scene
         const world_size = 10.0;
         const num_players = world_size/5;
         this.world = [];
+        this.hex_to_sprite.clear()
+        this.occupied.clear();
 
         this.camera_controls.stop();
 
@@ -150,7 +148,7 @@ export class WorldScene extends Phaser.Scene
         }, this);   
 
         // spawn starting locations and determine begining territories
-        [this.capitol_positions, this.territories] = placeCapitols(this.world, this.world_string_set, world_size, num_players);
+        [this.capitol_positions, this.territories, this.closest_units] = placeCapitols(this.world, this.world_string_set, world_size, num_players);
 
         // assign colours
         var available_colours = player_colours.slice(); // clone
@@ -383,6 +381,7 @@ export class WorldScene extends Phaser.Scene
             var player_cap = this.player_capitol_hex.toString();
             var p = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
             var h = hexLib.hex_round(hexLib.pixel_to_hex(hex_layout, p));
+            console.log(h);
             if (h.toString() == player_cap)
             {
                 if (is_placing_unit)
@@ -469,8 +468,7 @@ export class WorldScene extends Phaser.Scene
                                                 unit.setTint(lerpColour(black, grey, tween.getValue()));
                                             }
                                         });
-                                        this.previous_territories = new Map(this.territories);
-                                        this.territories = determineTerritories(this.world, this.getPlayerPositions(), this.world_string_set);
+                                        [this.territories, this.closest_units] = determineTerritories(this.world, this.getPlayerPositions(), this.world_string_set);
                                         this.colourTerritories(false);
                                     }, [], this);
                                     this.tweens.add({
@@ -506,13 +504,9 @@ export class WorldScene extends Phaser.Scene
         var players = [];
         for (var i=0; i < this.player_colours.length; i++) 
             players.push([]);
-        console.log(players);
         this.occupied.forEach(function(unit, hex, map)
         {
-            console.log(hex);
-            console.log(unit);
-            console.log(unit.owner_id);
-            players[unit.owner_id].push(hex);
+            players[unit.owner_id].push(hexLib.Hex.prototype.fromString(hex));
         });
         return players;
     }
