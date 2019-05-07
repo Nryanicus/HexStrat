@@ -44,6 +44,7 @@ export class Unit extends Phaser.GameObjects.Image
 
         var p = hexLib.hex_to_pixel(hex_layout, this.hex);
         var utp = this.scene.add.image(p.x, p.y-2, this.type);
+        utp.setTint(black);
         utp.setAlpha(0.5);
         this.scene.registry.set(events.is_placing_unit, true);
         this.scene.registry.set(events.unit_to_place, utp);
@@ -52,7 +53,7 @@ export class Unit extends Phaser.GameObjects.Image
         possible_destinations.forEach(function(h)
         {
             p = hexLib.hex_to_pixel(hex_layout, h);
-            var flat = this.scene.add.image(p.x, p.y, 'hex_flat').setInteractive({pixelPerfect:true});
+            var flat = this.scene.add.image(p.x, p.y, 'hex_flat').setInteractive(this.scene.input.makePixelPerfect(1));
             flat.setBlendMode(Phaser.BlendModes.ADD);
             flat.on('pointerdown', function(event)
             {

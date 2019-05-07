@@ -58,6 +58,7 @@ export class Capitol extends Phaser.GameObjects.Image
             img.on('pointerdown', function(event)
             {
                 this.close_menu();
+                this.scene.events.emit(events.show_hex_cursor);
 
                 var p = this.scene.cameras.main.getWorldPoint(event.x, event.y);
                 var h = hexLib.hex_round(hexLib.pixel_to_hex(hex_layout, p));
@@ -71,7 +72,7 @@ export class Capitol extends Phaser.GameObjects.Image
                     if (this.scene.occupied.has(h.toString()))
                         return;
                     p = hexLib.hex_to_pixel(hex_layout, h);
-                    var flat = this.scene.add.image(p.x, p.y, 'hex_flat').setInteractive({pixelPerfect:true});
+                    var flat = this.scene.add.image(p.x, p.y, 'hex_flat').setInteractive(this.scene.input.makePixelPerfect(1));
                     flat.setBlendMode(Phaser.BlendModes.ADD);
                     flat.setAlpha(0.01);
                     flats.push(flat);
@@ -82,6 +83,7 @@ export class Capitol extends Phaser.GameObjects.Image
                         utp.hex = h;
                         this.scene.occupied.set(h.toString(), utp);
                         this.scene.registry.set(events.is_placing_unit, false);
+                        this.scene.events.emit(events.recalc_territories);
                         flats.map(f => f.destroy());
                         flats = [];
                         this.scene.tweens.add({
