@@ -17,7 +17,6 @@ export class WorldScene extends Phaser.Scene
     {
         super("world");
         this.camera_controls;
-        this.can_gen = false;
         this.occupied = new Map();
         this.hex_to_sprite = new Map();
 
@@ -58,16 +57,6 @@ export class WorldScene extends Phaser.Scene
         };
 
         this.camera_controls = new Phaser.Cameras.Controls.FixedKeyControl(controlConfig);
-
-        this.input.keyboard.on('keydown-Z', function (event) 
-        {
-            if (this.can_gen)
-            {
-                this.can_gen = false;
-                this.events.emit(events.hide_hex_cursor);
-                this.scene.restart();
-            }
-        }, this);
 
         this.events.on(events.recalc_territories, function()
         {
@@ -223,7 +212,7 @@ export class WorldScene extends Phaser.Scene
             var cam = this.cameras.main;
             cam.pan(500, 500, 1000, "Linear");
             this.camera_controls.start();
-            this.can_gen = true;
+            this.registry.set(events.can_gen, true);
             this.events.emit(events.show_hex_cursor);
         }, [], this);
     }

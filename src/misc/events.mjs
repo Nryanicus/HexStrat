@@ -9,3 +9,4 @@ export const show_hex_cursor = "show_hex_cursor";
 export const is_placing_unit = "is_placing_unit";
 export const unit_to_place = "unit_to_place";
 export const recalc_territories = "recalc_territories";
+export const can_gen = "can_gen";
