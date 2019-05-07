@@ -166,10 +166,7 @@ export function placeCapitols(world, world_string_set, world_size, num_players)
             available_world = available_world_original;
             attempts++;
             if (attempts == 1000)
-            {
-                console.log("failure");
                 return [[], [], []];
-            }
         }
     }
 
