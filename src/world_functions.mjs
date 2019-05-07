@@ -166,7 +166,7 @@ export function placeCapitols(world, world_string_set, world_size, num_players)
             if (attempts == 1000)
             {
                 console.log("failure");
-                return;
+                return [[], [], []];
             }
         }
     }
@@ -200,6 +200,9 @@ export function determineTerritories(world, players, world_string_set)
             }
         }
         var min_dist_player = -1;
+
+        // FIXME: need to check all closest units, not just two
+
         var closest = bh.extractMinimum();
         var second_closest = bh.extractMinimum();
         // if the two closest units are equidistant and not on the same side then the hex is neutral
