@@ -33,21 +33,39 @@ export class Unit extends Phaser.GameObjects.Image
 
         this.scene.occupied.delete(this.hex.toString());
 
-        var possible_destinations = [this.hex];
-        hexLib.hex_spiral(this.hex, this.move_range+1).forEach(function(h)
-        {
-            if (! this.scene.world_string_set.has(h.toString()) || this.scene.occupied.has(h.toString()))
-                return;
-            if (aStar(this.hex, h, this.scene.world_string_set).length > 0)
-                possible_destinations.push(h);
-        }, this);
-
         var p = hexLib.hex_to_pixel(hex_layout, this.hex);
         var utp = this.scene.add.image(p.x, p.y-2, this.type);
         utp.setTint(black);
         utp.setAlpha(0.5);
         this.scene.registry.set(events.is_placing_unit, true);
         this.scene.registry.set(events.unit_to_place, utp);
+
+        // determine where the unit can be placed
+        var valid_positions = new Set();
+        var valid_destinations = new Set();
+        hexLib.hex_spiral(this.hex, this.move_range+1).forEach(function(h)
+        {
+            if (!this.scene.world_string_set.has(h.toString()))
+                return;
+            if (this.scene.occupied.has(h.toString()) && this.scene.occupied.get(h.toString()).owner_id != this.owner_id)
+                return;
+            valid_positions.add(h.toString());
+        }, this);
+
+        var possible_destinations = [this.hex];
+        var possible_paths = new Map();
+        var pf = new aStar(valid_positions);
+        hexLib.hex_spiral(this.hex, this.move_range+1).forEach(function(h)
+        {
+            if (this.scene.occupied.has(h.toString()))
+                return;
+            var path = pf.findPath(this.hex, h);
+            if (path.length > 0)
+            {
+                possible_destinations.push(h);
+                possible_paths.set(h.toString(), path);
+            }
+        }, this);
 
         var flats = [];
         possible_destinations.forEach(function(h)
@@ -64,9 +82,8 @@ export class Unit extends Phaser.GameObjects.Image
                 this.scene.registry.set(events.is_placing_unit, false);
                 utp.destroy();
                 flats.map(f => f.destroy());
-
                 // lerp into position along path
-                this.moveTo(h);
+                this.moveTo(h, possible_paths.get(h.toString()));
                 this.scene.events.emit(events.recalc_territories);
                 // todo have attack anim and UI
             }, this);
@@ -83,10 +100,9 @@ export class Unit extends Phaser.GameObjects.Image
         }, this);
     }
 
-    moveTo(h)
+    moveTo(h, path)
     {
         this.can_move = h.toString() == this.hex.toString();
-        var path = aStar(this.hex, h, this.scene.world_string_set);
         this.hex = h;
 
         if (this.can_move)

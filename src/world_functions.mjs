@@ -117,7 +117,7 @@ export function generateWorld(world_size)
 
 export function placeCapitols(world, world_string_set, world_size, num_players)
 {
-    const min_dist = world_size/num_players;
+    const min_dist = 7;//world_size/num_players;
     
     // all non-coastal locations are valid starting locations
     var available_world = [];
@@ -137,6 +137,8 @@ export function placeCapitols(world, world_string_set, world_size, num_players)
     var taken_positions = [];
     var attempts = 0;
 
+    var pathfinder = new aStar(world_string_set);
+
     while (taken_positions.length != num_players)
     {
         // look for a spot
@@ -148,7 +150,7 @@ export function placeCapitols(world, world_string_set, world_size, num_players)
         var available_world_tmp = [];
         available_world.forEach(function(h)
         {
-            var dist = aStar(pos, h, world_string_set).length;
+            var dist = pathfinder.findPath(pos, h).length;
             if (dist > min_dist)
                 available_world_tmp.push(h);
         }); 
@@ -175,15 +177,15 @@ export function placeCapitols(world, world_string_set, world_size, num_players)
     for (var i = 0; i < num_players; i++)
         players.push([taken_positions[i]]);
     var territories, closest_units;
-    [territories, closest_units] = determineTerritories(world, players, world_string_set);
+    [territories, closest_units] = determineTerritories(world, players, pathfinder);
 
-    return [taken_positions, territories, closest_units];
+    return [taken_positions, territories, closest_units, pathfinder];
 }
 
 // world : iterable of Hex, [Hex]
 // players : array of array of hex, [[Hex]]. i.e a list of a list of each players' positions
 // returns map of Hex to int, the owning player's index. With -1 for neutral hexes
-export function determineTerritories(world, players, world_string_set)
+export function determineTerritories(world, players, pathfinder)
 {
     var territories = new Map(); // Hex.toString() => int
     var closest_units = new Map();
@@ -195,7 +197,7 @@ export function determineTerritories(world, players, world_string_set)
             for (var j=0; j<players[i].length; j++) 
             {
                 var p = players[i][j];
-                var d = aStar(h, p, world_string_set).length;
+                var d = pathfinder.findPath(h, p).length;
                 bh.insert(d, {unit_p: p, player: i});
             }
         }

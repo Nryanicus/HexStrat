@@ -2,7 +2,7 @@
 
 import * as hexLib from "./misc/hex-functions.mjs";
 import {shuffle, lerpColour} from "./misc/utilities.mjs";
-import {aStar, clearCache} from "./misc/aStar.mjs";
+import {aStar} from "./misc/aStar.mjs";
 import {hex_layout, player_colours, white, grey, black} from "./misc/constants.mjs";
 import * as events from "./misc/events.mjs";
 import {Unit} from "./Unit.mjs";
@@ -19,6 +19,7 @@ export class WorldScene extends Phaser.Scene
         this.camera_controls;
         this.occupied = new Map();
         this.hex_to_sprite = new Map();
+        this.pathfinder;
 
         this.world;
         this.world_string_set;
@@ -60,47 +61,12 @@ export class WorldScene extends Phaser.Scene
 
         this.events.on(events.recalc_territories, function()
         {
-            [this.territories, this.closest_units] = determineTerritories(this.world, this.getPlayerPositions(), this.world_string_set);
+            [this.territories, this.closest_units] = determineTerritories(this.world, this.getPlayerPositions(), this.pathfinder);
             this.colourTerritories(false);
         }, this);
 
         this.createMap();
         this.initUI();
-    }
-
-    colourTerritories(initial_delay=true)
-    {
-        // colour all environs, in radial fashion
-        var max_d = 0;
-        var tween_map = new Map();
-        this.hex_to_sprite.forEach(function(hex, string, map)
-        {
-            var owner_id = this.territories.get(string);
-            var d = aStar(hexLib.Hex.prototype.fromString(string), this.closest_units.get(string), this.world_string_set).length;
-
-            max_d = d > max_d ? d : max_d;
-            var col1 = hex.isTinted ? hex.tint : white;
-            var col2 = owner_id != -1 ? this.player_colours[owner_id] : white;
-            var initdelay = 0;
-            if (initial_delay)
-                initdelay = 300+this.world.length+1000*owner_id;
-            var tween = this.tweens.addCounter({
-                from: 0,
-                to: 1,
-                ease: 'Linear',
-                duration: 100,
-                delay: initdelay + d*100,
-                onUpdate: function()
-                {
-                    hex.setTint(lerpColour(col1, col2, tween_map.get(string).getValue()));
-                    hex.tint = col2;
-                }
-            }, this);
-
-            tween_map.set(string, tween);
-        }, this);
-
-        return max_d;
     }
 
     createMap()
@@ -113,19 +79,18 @@ export class WorldScene extends Phaser.Scene
 
         this.camera_controls.stop();
 
-        clearCache();
-
         while (true)
         {
             while (this.world.length < num_players*world_size*2)
-                this.world = generateWorld(world_size, hex_layout);
+                this.world = generateWorld(world_size);
             this.world_string_set = new Set( this.world.map(x => x.toString()) );
 
             // spawn starting locations and determine begining territories
-            [this.capitol_positions, this.territories, this.closest_units] = placeCapitols(this.world, this.world_string_set, world_size, num_players);
+            [this.capitol_positions, this.territories, this.closest_units, this.pathfinder] = placeCapitols(this.world, this.world_string_set, world_size, num_players);
             // if placeCapitols came back with real data we're done genning
             if (this.capitol_positions.length > 0)
                 break;
+            this.world = [];
         }
 
         var i = 0;
@@ -263,6 +228,42 @@ export class WorldScene extends Phaser.Scene
         });
         return players;
     }
+
+    colourTerritories(initial_delay=true)
+    {
+        // colour all environs, in radial fashion
+        var max_d = 0;
+        var tween_map = new Map();
+        this.hex_to_sprite.forEach(function(hex, string, map)
+        {
+            var owner_id = this.territories.get(string);
+            var d = this.pathfinder.findPath(hexLib.Hex.prototype.fromString(string), this.closest_units.get(string)).length;
+
+            max_d = d > max_d ? d : max_d;
+            var col1 = hex.isTinted ? hex.tint : white;
+            var col2 = owner_id != -1 ? this.player_colours[owner_id] : white;
+            var initdelay = 0;
+            if (initial_delay)
+                initdelay = 300+this.world.length+1000*owner_id;
+            var tween = this.tweens.addCounter({
+                from: 0,
+                to: 1,
+                ease: 'Linear',
+                duration: 100,
+                delay: initdelay + d*100,
+                onUpdate: function()
+                {
+                    hex.setTint(lerpColour(col1, col2, tween_map.get(string).getValue()));
+                    hex.tint = col2;
+                }
+            }, this);
+
+            tween_map.set(string, tween);
+        }, this);
+
+        return max_d;
+    }
+
 
     update (time, delta)
     {
