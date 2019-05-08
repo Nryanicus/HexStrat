@@ -49,14 +49,6 @@ export class UIScene extends Phaser.Scene
         
         this.ui.add([this.background, sword_glow, cavalry_glow, pike_glow, musket_glow, end_turn_glow, sword_select, cavalry_select, pike_select, musket_select, end_turn_select]);
         this.ui.setInteractive(new Phaser.Geom.Rectangle(0, 0, 1138, 156), Phaser.Geom.Rectangle.Contains);
-        this.ui.on("pointerover", function()
-        {
-            this.world.events.emit(events.hide_cursor);
-        }, this);
-        this.ui.on("pointerout", function()
-        {
-            this.world.events.emit(events.show_cursor);
-        }, this);
 
         var select_map = new Map([[sword_select, events.recruit_sword],
                                   [cavalry_select, events.recruit_cavalry],
@@ -86,7 +78,7 @@ export class UIScene extends Phaser.Scene
             });
             img.on("pointerdown", function()
             {
-                this.world.events.emit(select_map.get(img), this.player_id);
+                this.world.events.emit(events.recruit, select_map.get(img), this.player_id);
             }, this);
             img.on("pointerover", function()
             {

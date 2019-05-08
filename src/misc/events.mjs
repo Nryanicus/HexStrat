@@ -6,15 +6,17 @@ export const hide_hex_cursor = "hide_hex_cursor";
 export const show_hex_cursor = "show_hex_cursor";
 export const show_ui = "show_ui";
 export const hide_ui = "hide_ui";
-export const sword_select = "recruit_sword";
-export const cavalry_select = "recruit_cavalry";
-export const pike_select = "recruit_pike";
-export const musket_select = "recruit_musket";
-export const end_turn_select = "end_turn";
 
+export const recruit = "recruit";
+export const recruit_sword = "sword";
+export const recruit_cavalry = "cavalry";
+export const recruit_pike = "pike";
+export const recruit_musket = "musket";
 
 // registry keys
 export const is_placing_unit = "is_placing_unit";
 export const unit_to_place = "unit_to_place";
 export const recalc_territories = "recalc_territories";
 export const can_gen = "can_gen";
+export const menu_open = "menu_open";
+export const cursor_outside_menu = "cursor_outside_menu";

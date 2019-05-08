@@ -32,7 +32,7 @@ export class WorldScene extends Phaser.Scene
     preload()
     {
         this.load.image('hex', 'res/Hex.png');
-        this.load.image('capitol', 'res/Cap.png');
+        this.load.image('capitol', 'res/Capitol.png');
 
         this.load.image('purchase', 'res/Purchase.png');
         this.load.image('purchase_select', 'res/PurchaseSelection.png');
@@ -40,9 +40,9 @@ export class WorldScene extends Phaser.Scene
         this.load.image('hex_flat', 'res/HexGlow.png');
 
         this.load.image('sword', 'res/Sword.png');
-        this.load.image('spear', 'res/Spear.png');
-        this.load.image('cavalry', 'res/Cav.png');
-        this.load.image('ranged', 'res/Ranged.png');
+        this.load.image('pike', 'res/Pike.png');
+        this.load.image('cavalry', 'res/Cavalry.png');
+        this.load.image('musket', 'res/Musket.png');
     }
 
     create()
@@ -205,7 +205,13 @@ export class WorldScene extends Phaser.Scene
             var p = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
             var h = hexLib.hex_round(hexLib.pixel_to_hex(hex_layout, p));
             if (this.world_string_set.has(h.toString()))
+            {
                 this.events.emit(events.hexover, h);
+                if ( (!this.registry.get(events.menu_open) || this.registry.get(events.cursor_outside_menu)) && this.registry.get(events.can_gen) )
+                    this.events.emit(events.show_hex_cursor, h);
+            }
+            else
+                this.events.emit(events.hide_hex_cursor, h);
         },this);
 
         // map interaction
