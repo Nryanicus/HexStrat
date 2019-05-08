@@ -34,11 +34,10 @@ export class WorldScene extends Phaser.Scene
         this.load.image('hex', 'res/Hex.png');
         this.load.image('capitol', 'res/Cap.png');
 
-        this.load.image('reference', 'res/Reference.png');
         this.load.image('purchase', 'res/Purchase.png');
         this.load.image('purchase_select', 'res/PurchaseSelection.png');
         this.load.image('hex_select', 'res/HexOutlineBlur.png');
-        this.load.image('hex_flat', 'res/HexFlat.png');
+        this.load.image('hex_flat', 'res/HexGlow.png');
 
         this.load.image('sword', 'res/Sword.png');
         this.load.image('spear', 'res/Spear.png');
@@ -176,15 +175,19 @@ export class WorldScene extends Phaser.Scene
         {
             var cam = this.cameras.main;
             cam.pan(500, 500, 1000, "Linear");
+        }, [], this);
+        this.time.delayedCall(300+this.world.length+1000*(num_players-1) + max_d*100 + 1000, function()
+        {
             this.camera_controls.start();
             this.registry.set(events.can_gen, true);
             this.events.emit(events.show_hex_cursor);
+            this.events.emit(events.show_ui, true);
         }, [], this);
     }
 
     initUI()
     {
-        var cursor = new HexCursor(this, 0, 0);
+        var cursor = new HexCursor(this, -1000, -1000);
         this.add.existing(cursor);
 
         // do input reading instead of events on the hex images themselves to ensure even if other

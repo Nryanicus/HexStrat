@@ -2,6 +2,8 @@ import * as hexLib from "./misc/hex-functions.mjs";
 import {hex_layout} from "./misc/constants.mjs";
 import * as events from "./misc/events.mjs";
 
+//todo: add ghost trail that fades out
+
 export class HexCursor extends Phaser.GameObjects.Image 
 {
     constructor (scene, x, y)
@@ -12,6 +14,7 @@ export class HexCursor extends Phaser.GameObjects.Image
         this.setPosition(x, y);
         this.setAlpha(0.75);
         this.setBlendMode(Phaser.BlendModes.ADD);
+        this.setVisible(false);
         this.depth = 1;
 
         // glow

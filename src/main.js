@@ -9,9 +9,8 @@ var config = {
     height: window.innerHeight,
     scene: [MasterScene],
     backgroundColor: background,
-    render: { // todo experiment with pixel art setting
-        antialias: false,
-        roundPixels: true,
+    render: {
+        pixelArt: true,
     }
 };
 

@@ -60,7 +60,7 @@ export class Unit extends Phaser.GameObjects.Image
             if (this.scene.occupied.has(h.toString()))
                 return;
             var path = pf.findPath(this.hex, h);
-            if (path.length > 0)
+            if (path.length > 0 && path.length <= this.move_range)
             {
                 possible_destinations.push(h);
                 possible_paths.set(h.toString(), path);
