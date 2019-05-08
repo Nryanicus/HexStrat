@@ -13,6 +13,8 @@ export const recruit_cavalry = "cavalry";
 export const recruit_pike = "pike";
 export const recruit_musket = "musket";
 
+export const end_turn = "end_turn";
+
 // registry keys
 export const is_placing_unit = "is_placing_unit";
 export const unit_to_place = "unit_to_place";

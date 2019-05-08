@@ -78,7 +78,10 @@ export class UIScene extends Phaser.Scene
             });
             img.on("pointerdown", function()
             {
-                this.world.events.emit(events.recruit, select_map.get(img), this.player_id);
+                if (img != end_turn_select)
+                    this.world.events.emit(events.recruit, select_map.get(img), this.player_id);
+                else
+                    this.world.events.emit(select_map.get(img));
             }, this);
             img.on("pointerover", function()
             {

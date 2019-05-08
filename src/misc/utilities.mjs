@@ -41,6 +41,11 @@ export function getRandomInt(min, max)
     return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+export function getRandomFloat(min, max) 
+{
+  return Math.random() * (max - min) + min;
+}
+
 /**
  * Shuffles array in place. ES6 version
  * @param {Array} a items An array containing the items.

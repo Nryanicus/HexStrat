@@ -1,6 +1,6 @@
 import {aStar} from "./misc/aStar.mjs";
 import {hex_layout, grey, black} from "./misc/constants.mjs";
-import {lerpColour} from "./misc/utilities.mjs";
+import {lerpColour, getRandomFloat} from "./misc/utilities.mjs";
 import * as hexLib from "./misc/hex-functions.mjs";
 import * as events from "./misc/events.mjs";
 
@@ -23,6 +23,8 @@ export class Unit extends Phaser.GameObjects.Image
         this.can_move = type != "capitol";
 
         this.move_range = type == "cavalry" ? 5 : 3;
+
+        this.scene.events.on(events.end_turn, this.handleTurnEnd, this);
     }
 
     handlePointerDown()
@@ -142,7 +144,7 @@ export class Unit extends Phaser.GameObjects.Image
         }, [], this);
         this.scene.tweens.add({
             targets: this,
-            ease: "Cubic",
+            ease: "Linear",
             duration: 600,
             delay: 120*i,
             y: "+=2"
@@ -156,24 +158,21 @@ export class Unit extends Phaser.GameObjects.Image
             // grey out after move
             var tween;
             var unit = this;
-            this.scene.time.delayedCall(120*i, function()
-            {
-                tween = this.scene.tweens.addCounter({
-                    from: 0,
-                    to: 1,
-                    ease: 'Linear',
-                    duration: 600,
-                    onUpdate: function()
-                    {
-                        unit.setTint(lerpColour(grey, black, tween.getValue()));
-                    },
-                });
-            }, [], this);
+            var speed = getRandomFloat(0.1, 2);
+            tween = this.scene.tweens.addCounter({
+                from: 0,
+                to: 1,
+                ease: 'Linear',
+                duration: 600*speed,
+                onUpdate: function()
+                {
+                    unit.setTint(lerpColour(grey, black, tween.getValue()));
+                },
+            });
             this.scene.tweens.add({
                 targets: this,
-                ease: "Cubic",
-                duration: 600,
-                delay: 120*i,
+                ease: "Linear",
+                duration: 600*speed,
                 y: "-=2"
             });
         }
