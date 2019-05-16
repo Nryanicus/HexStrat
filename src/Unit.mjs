@@ -29,7 +29,7 @@ export class Unit extends Phaser.GameObjects.Image
 
     handlePointerDown()
     {
-        if (!this.can_move)
+        if (!this.can_move || this.scene.registry.get(events.is_placing_unit))
             return;
         this.can_move = false;
 
@@ -55,7 +55,7 @@ export class Unit extends Phaser.GameObjects.Image
         }, this);
 
         var possible_destinations = [this.hex];
-        var possible_paths = new Map();
+        var possible_paths = new Map([[this.hex.toString(), []]]);
         var pf = new aStar(valid_positions);
         hexLib.hex_spiral(this.hex, this.move_range+1).forEach(function(h)
         {
@@ -75,9 +75,9 @@ export class Unit extends Phaser.GameObjects.Image
             p = hexLib.hex_to_pixel(hex_layout, h);
             var flat = this.scene.add.image(p.x, p.y, 'hex_flat').setInteractive(this.scene.input.makePixelPerfect(1));
             flat.setBlendMode(Phaser.BlendModes.ADD);
-            flat.on('pointerdown', function(event)
+            flat.on('pointerdown', function(pointer, localx, localy, event)
             {
-                p = this.scene.cameras.main.getWorldPoint(event.x, event.y);
+                p = this.scene.cameras.main.getWorldPoint(pointer.x, pointer.y);
                 h = hexLib.hex_round(hexLib.pixel_to_hex(hex_layout, p));
                 p = hexLib.hex_to_pixel(hex_layout, h);
                 this.scene.occupied.set(h.toString(), this);
@@ -88,6 +88,7 @@ export class Unit extends Phaser.GameObjects.Image
                 this.moveTo(h, possible_paths.get(h.toString()));
                 this.scene.events.emit(events.recalc_territories);
                 // todo have attack anim and UI
+                event.stopPropagation();
             }, this);
             flat.setAlpha(0.01);
             this.scene.tweens.add({
@@ -109,23 +110,25 @@ export class Unit extends Phaser.GameObjects.Image
 
         if (this.can_move)
             return;
-
-        path = path.reverse();
-
-        var i = 0;
-        path.forEach(function(h)
+        if (path.length > 0)
         {
-            var p = hexLib.hex_to_pixel(hex_layout, h);
-            this.scene.tweens.add({
-                targets: this,
-                ease: "Cubic",
-                duration: 120,
-                delay: 120*i,
-                x: p.x,
-                y: p.y
-            });
-            i++;
-        }, this);
+            path = path.reverse();
+
+            var i = 0;
+            path.forEach(function(h)
+            {
+                var p = hexLib.hex_to_pixel(hex_layout, h);
+                this.scene.tweens.add({
+                    targets: this,
+                    ease: "Cubic",
+                    duration: 120,
+                    delay: 120*i,
+                    x: p.x,
+                    y: p.y
+                });
+                i++;
+            }, this);
+        }
         // grey out after move
         var tween;
         var unit = this;
@@ -158,7 +161,7 @@ export class Unit extends Phaser.GameObjects.Image
             // grey out after move
             var tween;
             var unit = this;
-            var speed = getRandomFloat(0.1, 2);
+            var speed = getRandomFloat(0.5, 1.5);
             tween = this.scene.tweens.addCounter({
                 from: 0,
                 to: 1,

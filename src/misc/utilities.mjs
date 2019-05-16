@@ -25,6 +25,10 @@ export function range(start, stop, step) {
 
 export function lerpColour(a, b, amount) 
 { 
+    if (amount == 0)
+        return a;
+    if (amount == 1)
+        return b;
     var ar = a >> 16, ag = a >> 8 & 0xff, ab = a & 0xff;
     var br = b >> 16, bg = b >> 8 & 0xff, bb = b & 0xff;
     var rr = ar + amount * (br - ar);
@@ -57,4 +61,15 @@ export function shuffle(a)
         [a[i], a[j]] = [a[j], a[i]];
     }
     return a;
+}
+
+export function padString(str)
+{
+    if (str.length > 8)
+        console.log("string too big, senpai, it won't fit, uguu");
+    while(str.length < 8)
+    {
+        str = " "+str;
+    }
+    return str;
 }

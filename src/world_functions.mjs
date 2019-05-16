@@ -117,7 +117,7 @@ export function generateWorld(world_size)
 
 export function placeCapitols(world, world_string_set, world_size, num_players)
 {
-    const min_dist = 7;//world_size/num_players;
+    const min_dist = Math.max(7, world_size/num_players);
     
     // all non-coastal locations are valid starting locations
     var available_world = [];

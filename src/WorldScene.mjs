@@ -62,10 +62,22 @@ export class WorldScene extends Phaser.Scene
         {
             [this.territories, this.closest_units] = determineTerritories(this.world, this.getPlayerPositions(), this.pathfinder);
             this.colourTerritories(false);
+            this.events.emit(events.territory_change);
         }, this);
+
+        this.registry.set("treasury0", 20);
+        this.registry.set("upkeep0", 0);
 
         this.createMap();
         this.initUI();
+
+        var i = 0;
+        this.territories.forEach(function(owner_id, string, map)
+        {
+            if (owner_id == 0)
+                i++;
+        }, this);
+        this.registry.set("income0", i);
     }
 
     createMap()
@@ -272,7 +284,6 @@ export class WorldScene extends Phaser.Scene
 
         return max_d;
     }
-
 
     update (time, delta)
     {

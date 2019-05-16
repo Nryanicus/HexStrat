@@ -1,5 +1,5 @@
 import * as hexLib from "./misc/hex-functions.mjs";
-import {hex_layout, black} from "./misc/constants.mjs";
+import {hex_layout, black, unit_cost} from "./misc/constants.mjs";
 import * as events from "./misc/events.mjs";
 import {Unit} from "./Unit.mjs";
 
@@ -56,10 +56,11 @@ export class Capitol extends Phaser.GameObjects.Image
         var unit_map = new Map([[sword,events.recruit_sword], [cavalry,events.recruit_cavalry], [pike,events.recruit_pike], [musket,events.recruit_musket]]);
         unit_options.forEach(function(img)
         {
-            img.on('pointerdown', function(event)
+            img.on('pointerdown', function(pointer, localx, localy, event)
             {
                 this.scene.events.emit(events.recruit, unit_map.get(img), this.owner_id);
                 this.scene.events.emit(events.show_hex_cursor);
+                event.stopPropagation();
             }, this);
 
             img.on('pointerover', function()
@@ -91,7 +92,10 @@ export class Capitol extends Phaser.GameObjects.Image
 
         this.scene.events.on(events.recruit, function(type, player_id)
         {
-            if (player_id != owner_id)
+            if (player_id != owner_id || this.scene.registry.get(events.is_placing_unit))
+                return;
+            var t = this.scene.registry.get("treasury"+this.owner_id.toString());
+            if (unit_cost.get(type) > t)
                 return;
 
             var flats = [];

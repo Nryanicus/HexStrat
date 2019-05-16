@@ -12,8 +12,10 @@ export const recruit_sword = "sword";
 export const recruit_cavalry = "cavalry";
 export const recruit_pike = "pike";
 export const recruit_musket = "musket";
-
+ 
 export const end_turn = "end_turn";
+
+export const territory_change = "territory_change";
 
 // registry keys
 export const is_placing_unit = "is_placing_unit";

@@ -1,4 +1,5 @@
 import * as hexLib from "./hex-functions.mjs";
+import {recruit_sword, recruit_cavalry, recruit_pike, recruit_musket} from "./events.mjs";
 
 export const hex_layout = hexLib.Layout(hexLib.layout_pointy, hexLib.Point(11.5,10.7), hexLib.Point(500,500));
 
@@ -21,3 +22,4 @@ export const green = 0x306141;
 
 export const colour_names = new Map([[background, "background"], [white, "white"], [purple, "purple"], [grey, "grey"], [brown, "brown"], [cream, "cream"], [light_blue, "light_blue"], [yellow, "yellow"], [pink, "pink"], [orange, "orange"], [deep_pink, "deep_pink"], [green, "green"]]);
 export const player_colours = [purple, brown, cream, light_blue, yellow, pink, orange, deep_pink, green];
+export const unit_cost = new Map([[recruit_sword, 3], [recruit_cavalry, 5], [recruit_pike, 3], [recruit_musket, 7]]);

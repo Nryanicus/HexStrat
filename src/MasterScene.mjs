@@ -29,7 +29,6 @@ export class MasterScene extends Phaser.Scene
                 this.scene.moveBelow('world', "ui");
                 var world = this.scene.get('world');
                 ui.setWorld(world);
-
             }
         }, this);
     }
