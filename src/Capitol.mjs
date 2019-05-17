@@ -58,7 +58,7 @@ export class Capitol extends Phaser.GameObjects.Image
         {
             img.on('pointerdown', function(pointer, localx, localy, event)
             {
-                this.scene.events.emit(events.recruit, unit_map.get(img), this.owner_id);
+                this.scene.events.emit(events.recruit_attempt, unit_map.get(img), this.owner_id);
                 event.stopPropagation();
             }, this);
 
@@ -91,12 +91,9 @@ export class Capitol extends Phaser.GameObjects.Image
 
         this.scene.events.on(events.recruit, function(type, player_id)
         {
-            if (player_id != owner_id || this.scene.registry.get(events.is_placing_unit))
+            if (player_id != this.owner_id)
                 return;
-            var t = this.scene.registry.get("treasury"+this.owner_id.toString());
-            if (unit_cost.get(type) > t)
-                return;
-
+            // don't check conditions, that happens in recruit_attempt
             var flats = [];
             this.closeMenu();
 
@@ -123,6 +120,7 @@ export class Capitol extends Phaser.GameObjects.Image
                     utp.hex = h;
                     this.scene.occupied.set(h.toString(), utp);
                     this.scene.registry.set(events.is_placing_unit, false);
+                    this.scene.registry.set(events.unit_to_place, null);
                     this.scene.events.emit(events.recalc_territories);
                     flats.map(f => f.destroy());
                     flats = [];

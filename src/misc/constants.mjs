@@ -23,3 +23,4 @@ export const green = 0x306141;
 export const colour_names = new Map([[background, "background"], [white, "white"], [purple, "purple"], [grey, "grey"], [brown, "brown"], [cream, "cream"], [light_blue, "light_blue"], [yellow, "yellow"], [pink, "pink"], [orange, "orange"], [deep_pink, "deep_pink"], [green, "green"]]);
 export const player_colours = [purple, brown, cream, light_blue, yellow, pink, orange, deep_pink, green];
 export const unit_cost = new Map([[recruit_sword, 3], [recruit_cavalry, 5], [recruit_pike, 3], [recruit_musket, 7]]);
+export const exclude_death_pixel = new Map([[recruit_sword, new Set([15, 16, 17])], [recruit_musket, new Set([16])], [recruit_pike, new Set([10, 16, 22])], [recruit_cavalry, new Set([9, 15, 17])]]);

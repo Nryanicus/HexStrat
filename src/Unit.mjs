@@ -1,6 +1,6 @@
 import {aStar} from "./misc/aStar.mjs";
-import {hex_layout, grey, black} from "./misc/constants.mjs";
-import {lerpColour, getRandomFloat} from "./misc/utilities.mjs";
+import {hex_layout, grey, black, exclude_death_pixel} from "./misc/constants.mjs";
+import {lerpColour, getRandomFloat, range, getRandomInt} from "./misc/utilities.mjs";
 import * as hexLib from "./misc/hex-functions.mjs";
 import * as events from "./misc/events.mjs";
 
@@ -25,6 +25,7 @@ export class Unit extends Phaser.GameObjects.Image
         this.move_range = type == "cavalry" ? 5 : 3;
 
         this.scene.events.on(events.end_turn, this.handleTurnEnd, this);
+        this.scene.events.on(events.player_bankrupt, this.die, this);
     }
 
     handlePointerDown()
@@ -82,6 +83,7 @@ export class Unit extends Phaser.GameObjects.Image
                 p = hexLib.hex_to_pixel(hex_layout, h);
                 this.scene.occupied.set(h.toString(), this);
                 this.scene.registry.set(events.is_placing_unit, false);
+                this.scene.registry.set(events.unit_to_place, null);
                 utp.destroy();
                 flats.map(f => f.destroy());
                 // lerp into position along path
@@ -131,7 +133,6 @@ export class Unit extends Phaser.GameObjects.Image
         }
         // grey out after move
         var tween;
-        var unit = this;
         this.scene.time.delayedCall(120*i, function()
         {
             tween = this.scene.tweens.addCounter({
@@ -141,8 +142,9 @@ export class Unit extends Phaser.GameObjects.Image
                 duration: 600,
                 onUpdate: function()
                 {
-                    unit.setTint(lerpColour(black, grey, tween.getValue()));
+                    this.setTint(lerpColour(black, grey, tween.getValue()));
                 },
+                onUpdateScope: this
             });
         }, [], this);
         this.scene.tweens.add({
@@ -160,7 +162,6 @@ export class Unit extends Phaser.GameObjects.Image
         {
             // grey out after move
             var tween;
-            var unit = this;
             var speed = getRandomFloat(0.5, 1.5);
             tween = this.scene.tweens.addCounter({
                 from: 0,
@@ -169,8 +170,9 @@ export class Unit extends Phaser.GameObjects.Image
                 duration: 600*speed,
                 onUpdate: function()
                 {
-                    unit.setTint(lerpColour(grey, black, tween.getValue()));
+                    this.setTint(lerpColour(grey, black, tween.getValue()));
                 },
+                onUpdateScope: this
             });
             this.scene.tweens.add({
                 targets: this,
@@ -180,5 +182,38 @@ export class Unit extends Phaser.GameObjects.Image
             });
         }
         this.can_move = true;
+    }
+
+    die(player_id)
+    {
+        if (player_id != this.owner_id) 
+            return;
+        range(1, 32).forEach(function(i)
+        {
+            if (exclude_death_pixel.get(this.type).has(i))
+                return;
+            var str = i.toString();
+            if (str.length == 1)
+                str = "0"+str;
+            var pixel = this.scene.add.image(this.x, this.y, "dead"+str);
+            pixel.setTint(black);
+            var x = getRandomFloat(-1,1);
+            var y = getRandomFloat(-1,1);
+            var power = getRandomInt(1, 20);
+            var duration = getRandomInt(300, 3000);
+            this.scene.tweens.add({
+                targets: pixel,
+                x: "+="+(x*power).toString(),
+                y: "+="+(y*power).toString(),
+                duration: duration,
+                alpha: 0,
+                ease: "Cubic",
+                onComplete: function() {pixel.destroy()}
+            }, this);
+        }, this);
+        this.scene.events.emit(events.unit_death, this)
+        this.scene.events.off(events.player_bankrupt, this.die);
+        this.scene.events.off(events.end_turn, this.handleTurnEnd);
+        this.destroy();
     }
 }

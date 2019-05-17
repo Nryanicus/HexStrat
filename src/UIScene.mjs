@@ -15,6 +15,8 @@ export class UIScene extends Phaser.Scene
         this.colour;
 
         this.background;
+
+        this.original_positions = new Map();
     }
 
     preload()
@@ -34,6 +36,12 @@ export class UIScene extends Phaser.Scene
         this.load.image('end_turn_select', 'res/UIEndTurnSelect.png');
 
         this.load.image('font', 'res/font.png');
+    }
+
+    create()
+    {   
+        this.loadFont();
+        this.initUI();
     }
 
     loadFont()
@@ -65,8 +73,8 @@ export class UIScene extends Phaser.Scene
                 if (n < 0)
                     n = "BANKRUPT";
                 target.setText(padString(n.toString(), 10));
-            },
-        });
+            }
+        }, this);
         if (to == from)
             return;
         var mod = (to - from < 0) ? "+" : "-";
@@ -77,7 +85,21 @@ export class UIScene extends Phaser.Scene
             duration: 300,
             yoyo: true,
             repeat: Math.floor(speed/300),
-            y: mod+"=2"
+            y: mod+"=2",
+            onComplete: function()
+            {
+                if (target.y != this.original_positions.get(target))
+                {
+                    this.tweens.add(
+                    {
+                        targets: target,
+                        ease: 'Cubic',
+                        duration: 100,
+                        y: this.original_positions.get(target),
+                    }, this);               
+                }
+            },
+            onCompleteScope: this
         }, this);
     }
 
@@ -100,19 +122,78 @@ export class UIScene extends Phaser.Scene
         this.treasury = this.add.bitmapText(558, -10, 'font').setOrigin(1, 0.5);
         this.treasury.setScale(2, 2);
         this.treasury.setLetterSpacing(2);
+        this.original_positions.set(this.treasury, -10);
         this.income = this.add.bitmapText(558, 18, 'font').setOrigin(1, 0.5);
         this.income.setScale(2, 2);
         this.income.setLetterSpacing(2);
+        this.original_positions.set(this.income, 18);
         this.upkeep = this.add.bitmapText(558, 46, 'font').setOrigin(1, 0.5);
         this.upkeep.setScale(2, 2);
         this.upkeep.setLetterSpacing(2);
+        this.original_positions.set(this.upkeep, 46);
+
+        this.ui.add([this.background, sword_glow, cavalry_glow, pike_glow, musket_glow, end_turn_glow, sword_select, cavalry_select, pike_select, musket_select, end_turn_select, this.treasury, this.income, this.upkeep]);
+
+        var select_map = new Map([[sword_select, events.recruit_sword],
+                                  [cavalry_select, events.recruit_cavalry],
+                                  [pike_select, events.recruit_pike],
+                                  [musket_select, events.recruit_musket],
+                                  [end_turn_select, events.end_turn]]);
+
+        var glow_map = new Map([[sword_select, sword_glow],
+                                  [cavalry_select, cavalry_glow],
+                                  [pike_select, pike_glow],
+                                  [musket_select, musket_glow],
+                                  [end_turn_select, end_turn_glow]]);
+
+        [sword_select, cavalry_select, pike_select, musket_select, end_turn_select].forEach(function(img)
+        {
+            img.setInteractive(this.input.makePixelPerfect(1));
+            glow_map.get(img).setVisible(false);
+            glow_map.get(img).setBlendMode(Phaser.BlendModes.ADD);
+            glow_map.get(img).setAlpha(0.1);
+            this.tweens.add({
+                targets: glow_map.get(img),
+                ease: 'Linear',
+                duration: 600,
+                repeat: -1,
+                yoyo: true,
+                alpha: 1
+            });
+            img.on("pointerdown", function()
+            {
+                if (img != end_turn_select)
+                    this.world.events.emit(events.recruit_attempt, select_map.get(img), this.player_id);
+                else
+                    this.world.events.emit(select_map.get(img));
+            }, this);
+            img.on("pointerover", function()
+            {
+                glow_map.get(img).setVisible(true);
+            }, this);
+            img.on("pointerout", function()
+            {
+                glow_map.get(img).setVisible(false);
+            }, this);
+        }, this);
+    }
+
+    initEventHandlers()
+    {
+        this.events.on(events.hide_ui, function()
+        {
+            this.tweens.killAll();
+            this.ui.setPosition(this.cameras.main.width/2, this.cameras.main.height - 16 - this.height/2 + this.height*2);
+        }, this);
 
         // TODO, move the logic here into a dedicated simulator class and have this just be an observer
-        this.world.events.on(events.recruit, function(type, player_id)
+        this.world.events.on(events.recruit_attempt, function(type, player_id)
         {
-            if (player_id != this.player_id)
+            if (player_id != this.player_id || this.registry.get(events.is_placing_unit))
                 return;
             var t = this.registry.get("treasury"+player_id.toString());
+
+            // can't afford, shake treasury and return
             if (unit_cost.get(type) > t)
             {
                 var tween;
@@ -132,14 +213,30 @@ export class UIScene extends Phaser.Scene
                 this.tweens.add(
                 {
                     targets: this.treasury,
-                    ease: 'Cubic',
-                    duration: 300,
+                    ease: 'Quintic',
+                    duration: 75,
                     yoyo: true,
-                    y: "-=2"
+                    x: "+=2"
+                }, this);
+                this.tweens.add(
+                {
+                    targets: this.treasury,
+                    delay: 150,
+                    ease: 'Quintic',
+                    duration: 75,
+                    yoyo: true,
+                    x: "-=2"
                 }, this);
                 return;
             }
 
+            this.world.events.emit(events.recruit, type, player_id);
+        }, this);
+
+        this.world.events.on(events.recruit, function(type, player_id)
+        {
+            console.log("recruit");
+            var t = this.registry.get("treasury"+player_id.toString());
             var curr_t = t;
             var cost = unit_cost.get(type);
             t -= cost;
@@ -175,67 +272,22 @@ export class UIScene extends Phaser.Scene
             t += inc - up;
             this.registry.set("treasury"+this.player_id.toString(), t);
             this.lerpNumericText(this.treasury, curr_t, t);
+
+            if (t < 0)
+                this.world.events.emit(events.player_bankrupt, this.player_id);
         }, this);
 
-        this.treasury.setText(padString("20", 10));
-        this.income.setText(padString(this.registry.get("income"+this.player_id.toString()).toString(), 10));
-        this.upkeep.setText(padString("0", 10));
-
-        this.ui.add([this.background, sword_glow, cavalry_glow, pike_glow, musket_glow, end_turn_glow, sword_select, cavalry_select, pike_select, musket_select, end_turn_select, this.treasury, this.income, this.upkeep]);
-
-        var select_map = new Map([[sword_select, events.recruit_sword],
-                                  [cavalry_select, events.recruit_cavalry],
-                                  [pike_select, events.recruit_pike],
-                                  [musket_select, events.recruit_musket],
-                                  [end_turn_select, events.end_turn]]);
-
-        var glow_map = new Map([[sword_select, sword_glow],
-                                  [cavalry_select, cavalry_glow],
-                                  [pike_select, pike_glow],
-                                  [musket_select, musket_glow],
-                                  [end_turn_select, end_turn_glow]]);
-
-        [sword_select, cavalry_select, pike_select, musket_select, end_turn_select].forEach(function(img)
+        // reduce upkeep of slain unit
+        this.world.events.on(events.unit_death, function (unit) 
         {
-            img.setInteractive(this.input.makePixelPerfect(1));
-            glow_map.get(img).setVisible(false);
-            glow_map.get(img).setBlendMode(Phaser.BlendModes.ADD);
-            glow_map.get(img).setAlpha(0.1);
-            this.tweens.add({
-                targets: glow_map.get(img),
-                ease: 'Linear',
-                duration: 600,
-                repeat: -1,
-                yoyo: true,
-                alpha: 1
-            });
-            img.on("pointerdown", function()
-            {
-                if (img != end_turn_select)
-                    this.world.events.emit(events.recruit, select_map.get(img), this.player_id);
-                else
-                    this.world.events.emit(select_map.get(img));
-            }, this);
-            img.on("pointerover", function()
-            {
-                glow_map.get(img).setVisible(true);
-            }, this);
-            img.on("pointerout", function()
-            {
-                glow_map.get(img).setVisible(false);
-            }, this);
-        }, this);
-    }
+            if (unit.owner_id != this.player_id)
+                return;
 
-    create()
-    {   
-        this.loadFont();
-        this.initUI();
-
-        this.events.on(events.hide_ui, function()
-        {
-            this.tweens.killAll();
-            this.ui.setPosition(this.cameras.main.width/2, this.cameras.main.height - 16 - this.height/2 + this.height*2);
+            var up = this.registry.get("upkeep"+this.player_id.toString());
+            var curr_up = up;
+            up -= unit_cost.get(unit.type);
+            this.registry.set("upkeep"+this.player_id.toString(), up);
+            this.lerpNumericText(this.upkeep, curr_up, up);
         }, this);
     }
 
@@ -249,6 +301,9 @@ export class UIScene extends Phaser.Scene
             this.treasury.setTint(this.colour);
             this.income.setTint(this.colour);
             this.upkeep.setTint(this.colour);
+            this.treasury.setText(padString("20", 10));
+            this.income.setText(padString(this.registry.get("income"+this.player_id.toString()).toString(), 10));
+            this.upkeep.setText(padString("0", 10));
             this.tweens.add({
                 targets: this.ui,
                 ease: 'Cubic',
@@ -259,5 +314,6 @@ export class UIScene extends Phaser.Scene
         }, this); 
 
         this.world.events.emit(events.territory_change);
+        this.initEventHandlers();
     }
 }

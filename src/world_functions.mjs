@@ -81,14 +81,14 @@ export function generateWorld(world_size)
 
     var largest_subgraph_index = 0;
     var largest_subgraph_length = subgraphs[0].length;
-    for (var i in range(1, subgraphs.length))
+    range(1, subgraphs.length).forEach(function(i)
     {
         if (subgraphs[i].length > largest_subgraph_length)
         {
             largest_subgraph_length = subgraphs[i].length;
             largest_subgraph_index = i;
         }
-    }
+    });
 
     var largest_subgraph = subgraphs[largest_subgraph_index];
 

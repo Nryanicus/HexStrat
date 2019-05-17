@@ -43,6 +43,38 @@ export class WorldScene extends Phaser.Scene
         this.load.image('pike', 'res/Pike.png');
         this.load.image('cavalry', 'res/Cavalry.png');
         this.load.image('musket', 'res/Musket.png');
+
+        this.load.image('dead01', 'res/UnitDeathPixel01.png');
+        this.load.image('dead02', 'res/UnitDeathPixel02.png');
+        this.load.image('dead03', 'res/UnitDeathPixel03.png');
+        this.load.image('dead04', 'res/UnitDeathPixel04.png');
+        this.load.image('dead05', 'res/UnitDeathPixel05.png');
+        this.load.image('dead06', 'res/UnitDeathPixel06.png');
+        this.load.image('dead07', 'res/UnitDeathPixel07.png');
+        this.load.image('dead08', 'res/UnitDeathPixel08.png');
+        this.load.image('dead09', 'res/UnitDeathPixel09.png');
+        this.load.image('dead10', 'res/UnitDeathPixel10.png');
+        this.load.image('dead11', 'res/UnitDeathPixel11.png');
+        this.load.image('dead12', 'res/UnitDeathPixel12.png');
+        this.load.image('dead13', 'res/UnitDeathPixel13.png');
+        this.load.image('dead14', 'res/UnitDeathPixel14.png');
+        this.load.image('dead15', 'res/UnitDeathPixel15.png');
+        this.load.image('dead16', 'res/UnitDeathPixel16.png');
+        this.load.image('dead17', 'res/UnitDeathPixel17.png');
+        this.load.image('dead18', 'res/UnitDeathPixel18.png');
+        this.load.image('dead19', 'res/UnitDeathPixel19.png');
+        this.load.image('dead20', 'res/UnitDeathPixel20.png');
+        this.load.image('dead21', 'res/UnitDeathPixel21.png');
+        this.load.image('dead22', 'res/UnitDeathPixel22.png');
+        this.load.image('dead23', 'res/UnitDeathPixel23.png');
+        this.load.image('dead24', 'res/UnitDeathPixel24.png');
+        this.load.image('dead25', 'res/UnitDeathPixel25.png');
+        this.load.image('dead26', 'res/UnitDeathPixel26.png');
+        this.load.image('dead27', 'res/UnitDeathPixel27.png');
+        this.load.image('dead28', 'res/UnitDeathPixel28.png');
+        this.load.image('dead29', 'res/UnitDeathPixel29.png');
+        this.load.image('dead30', 'res/UnitDeathPixel30.png');
+        this.load.image('dead31', 'res/UnitDeathPixel31.png');
     }
 
     create()
@@ -65,7 +97,7 @@ export class WorldScene extends Phaser.Scene
             this.events.emit(events.territory_change);
         }, this);
 
-        this.registry.set("treasury0", 20);
+        this.registry.set("treasury0", 21);
         this.registry.set("upkeep0", 0);
 
         this.createMap();
@@ -78,6 +110,11 @@ export class WorldScene extends Phaser.Scene
                 i++;
         }, this);
         this.registry.set("income0", i);
+
+        this.input.keyboard.on('keydown-T', function (event)
+        {
+            this.events.emit(events.player_bankrupt, 0);
+        },this);
     }
 
     createMap()
@@ -235,6 +272,11 @@ export class WorldScene extends Phaser.Scene
                 var unit = this.occupied.get(hex.toString());
                 unit.handlePointerDown();
             }
+        }, this);
+
+        this.events.on(events.unit_death, function (unit) 
+        {
+            this.occupied.delete(unit.hex.toString());
         }, this);
     }
 
