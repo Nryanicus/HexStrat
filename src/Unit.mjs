@@ -1,5 +1,5 @@
 import {aStar} from "./misc/aStar.mjs";
-import {hex_layout, grey, black, exclude_death_pixel} from "./misc/constants.mjs";
+import {hex_layout, grey, black, exclude_death_pixel, death_pixel_dirc} from "./misc/constants.mjs";
 import {lerpColour, getRandomFloat, range, getRandomInt} from "./misc/utilities.mjs";
 import * as hexLib from "./misc/hex-functions.mjs";
 import * as events from "./misc/events.mjs";
@@ -188,6 +188,7 @@ export class Unit extends Phaser.GameObjects.Image
     {
         if (player_id != this.owner_id) 
             return;
+        var initial_duration =  getRandomInt(150, 450);
         range(1, 32).forEach(function(i)
         {
             if (exclude_death_pixel.get(this.type).has(i))
@@ -197,8 +198,9 @@ export class Unit extends Phaser.GameObjects.Image
                 str = "0"+str;
             var pixel = this.scene.add.image(this.x, this.y, "dead"+str);
             pixel.setTint(black);
-            var x = getRandomFloat(-1,1);
-            var y = getRandomFloat(-1,1);
+            var starting_vec = death_pixel_dirc.get(str);
+            var x = starting_vec[0] + getRandomFloat(-1,1);
+            var y = starting_vec[1] + getRandomFloat(-1,1);
             var power = getRandomInt(1, 20);
             var duration = getRandomInt(300, 3000);
             this.scene.tweens.add({
@@ -206,9 +208,17 @@ export class Unit extends Phaser.GameObjects.Image
                 x: "+="+(x*power).toString(),
                 y: "+="+(y*power).toString(),
                 duration: duration,
+                delay: initial_duration,
                 alpha: 0,
                 ease: "Cubic",
                 onComplete: function() {pixel.destroy()}
+            }, this);
+            this.scene.tweens.add({
+                targets: pixel,
+                x: "-="+starting_vec[0].toString(),
+                y: "-="+starting_vec[1].toString(),
+                duration: initial_duration,
+                ease: "Expo"
             }, this);
         }, this);
         this.scene.events.emit(events.unit_death, this)
