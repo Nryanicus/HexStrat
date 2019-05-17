@@ -59,7 +59,6 @@ export class Capitol extends Phaser.GameObjects.Image
             img.on('pointerdown', function(pointer, localx, localy, event)
             {
                 this.scene.events.emit(events.recruit, unit_map.get(img), this.owner_id);
-                this.scene.events.emit(events.show_hex_cursor);
                 event.stopPropagation();
             }, this);
 
