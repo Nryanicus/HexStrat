@@ -19,6 +19,7 @@ export const pink = 0xdb41c3;
 export const orange = 0xff7930;
 export const deep_pink = 0xdb4161;
 export const green = 0x306141;
+export const red = 0xff0000;
 
 export const colour_names = new Map([[background, "background"], [white, "white"], [purple, "purple"], [grey, "grey"], [brown, "brown"], [cream, "cream"], [light_blue, "light_blue"], [yellow, "yellow"], [pink, "pink"], [orange, "orange"], [deep_pink, "deep_pink"], [green, "green"]]);
 export const player_colours = [purple, brown, cream, light_blue, yellow, pink, orange, deep_pink, green];

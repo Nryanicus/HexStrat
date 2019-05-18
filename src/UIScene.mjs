@@ -1,6 +1,6 @@
 import * as events from "./misc/events.mjs";
 import {getRandomInt, getRandomFloat, padString, lerpColour} from "./misc/utilities.mjs";
-import {unit_cost, white} from "./misc/constants.mjs";
+import {unit_cost, white, red} from "./misc/constants.mjs";
 
 export class UIScene extends Phaser.Scene
 {
@@ -61,12 +61,11 @@ export class UIScene extends Phaser.Scene
     {
         var tween;
         var diff = Math.abs(to - from);
-        var speed = getRandomFloat(0.5, 1.5)*diff;
         tween = this.tweens.addCounter({
             from: from,
             to: to,
             ease: 'Quadratic',
-            duration: 10*speed,
+            duration: 10,
             onUpdate: function()
             {
                 var n = Math.floor(tween.getValue());
@@ -84,7 +83,6 @@ export class UIScene extends Phaser.Scene
             ease: 'Cubic',
             duration: 300,
             yoyo: true,
-            repeat: Math.floor(speed/300),
             y: mod+"=2",
             onComplete: function()
             {
@@ -100,6 +98,20 @@ export class UIScene extends Phaser.Scene
                 }
             },
             onCompleteScope: this
+        }, this);
+
+        var tween2;
+        tween2 = this.tweens.addCounter({
+            from: 0,
+            to: 1,
+            ease: 'Quadratic',
+            duration: 300,
+            yoyo: true,
+            onUpdate: function()
+            {
+                target.setTint(lerpColour(this.colour, white, tween2.getValue()));
+            },
+            onUpdateScope: this
         }, this);
     }
 
@@ -197,8 +209,6 @@ export class UIScene extends Phaser.Scene
             if (unit_cost.get(type) > t)
             {
                 var tween;
-                var targ = this.treasury;
-                var col = this.colour;
                 tween = this.tweens.addCounter({
                     from: 0,
                     to: 1,
@@ -207,8 +217,9 @@ export class UIScene extends Phaser.Scene
                     yoyo: true,
                     onUpdate: function()
                     {
-                        targ.setTint(lerpColour(col, white, tween.getValue()));
-                    }
+                        this.treasury.setTint(lerpColour(this.colour, red, tween.getValue()));
+                    },
+                    onUpdateScope: this
                 }, this);
                 this.tweens.add(
                 {
@@ -235,7 +246,8 @@ export class UIScene extends Phaser.Scene
 
         this.world.events.on(events.recruit, function(type, player_id)
         {
-            console.log("recruit");
+            if (player_id != this.player_id)
+                return;
             var t = this.registry.get("treasury"+player_id.toString());
             var curr_t = t;
             var cost = unit_cost.get(type);
@@ -301,7 +313,7 @@ export class UIScene extends Phaser.Scene
             this.treasury.setTint(this.colour);
             this.income.setTint(this.colour);
             this.upkeep.setTint(this.colour);
-            this.treasury.setText(padString("20", 10));
+            this.treasury.setText(padString(this.registry.get("treasury"+this.player_id.toString()).toString(), 10));
             this.income.setText(padString(this.registry.get("income"+this.player_id.toString()).toString(), 10));
             this.upkeep.setText(padString("0", 10));
             this.tweens.add({

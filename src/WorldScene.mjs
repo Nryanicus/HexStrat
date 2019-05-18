@@ -44,6 +44,9 @@ export class WorldScene extends Phaser.Scene
         this.load.image('cavalry', 'res/Cavalry.png');
         this.load.image('musket', 'res/Musket.png');
 
+        this.load.image('attack', 'res/Attack.png');
+        this.load.image('attack_diag', 'res/AttackDiag.png');
+
         this.load.image('dead01', 'res/UnitDeathPixel01.png');
         this.load.image('dead02', 'res/UnitDeathPixel02.png');
         this.load.image('dead03', 'res/UnitDeathPixel03.png');
@@ -249,6 +252,7 @@ export class WorldScene extends Phaser.Scene
             if (this.world_string_set.has(h.toString()))
                 this.events.emit(events.hexdown, h);
         },this);
+
         this.input.on("pointermove", function(pointer)
         {
             var p = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
@@ -261,7 +265,7 @@ export class WorldScene extends Phaser.Scene
             }
             else
                 this.events.emit(events.hide_hex_cursor, h);
-        },this);
+        }, this);
 
         // map interaction
         this.events.on(events.hexdown, function (hex) 
@@ -272,11 +276,6 @@ export class WorldScene extends Phaser.Scene
                 var unit = this.occupied.get(hex.toString());
                 unit.handlePointerDown();
             }
-        }, this);
-
-        this.events.on(events.unit_death, function (unit) 
-        {
-            this.occupied.delete(unit.hex.toString());
         }, this);
     }
 

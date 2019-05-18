@@ -1,5 +1,5 @@
 import * as hexLib from "./misc/hex-functions.mjs";
-import {hex_layout} from "./misc/constants.mjs";
+import {hex_layout, red, white} from "./misc/constants.mjs";
 import * as events from "./misc/events.mjs";
 
 //todo: add ghost trail that fades out
@@ -19,15 +19,14 @@ export class HexCursor extends Phaser.GameObjects.Image
 
         // glow
 
-        var hs = this;
         this.scene.tweens.add({
-            targets: hs,
+            targets: this,
             ease: 'Linear',
             duration: 600,
             repeat: -1,
             yoyo: true,
             alpha: 1
-        });
+        }, this);
     
         // event listeners
 
@@ -35,8 +34,13 @@ export class HexCursor extends Phaser.GameObjects.Image
         {
             var p = hexLib.hex_to_pixel(hex_layout, h);
             this.setPosition(p.x, p.y);
-            if (this.scene.registry.get(events.is_placing_unit))
+            if (this.scene.registry.get(events.is_placing_unit) && !this.scene.occupied.has(h.toString()))
                 this.scene.registry.get(events.unit_to_place).setPosition(p.x, p.y-2);
+            if (this.scene.registry.get(events.is_placing_unit) && this.scene.occupied.has(h.toString())
+                && this.scene.registry.get(events.unit_to_place).owner_id != this.scene.occupied.get(h.toString()).owner_id)
+                this.setTint(red);
+            else
+                this.setTint(white);
         }, this);
 
         this.scene.events.on(events.hide_hex_cursor, function()

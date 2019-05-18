@@ -1,8 +1,57 @@
 import {aStar} from "./misc/aStar.mjs";
-import {hex_layout, grey, black, exclude_death_pixel, death_pixel_dirc} from "./misc/constants.mjs";
+import {hex_layout, grey, black, red, exclude_death_pixel, death_pixel_dirc} from "./misc/constants.mjs";
 import {lerpColour, getRandomFloat, range, getRandomInt} from "./misc/utilities.mjs";
 import * as hexLib from "./misc/hex-functions.mjs";
 import * as events from "./misc/events.mjs";
+
+function get_attack_indication(h)
+{
+    var img_id, flipx, flipy, x, y;
+    img_id = "attack_diag";
+    flipx = false;
+    flipy = false;
+    x = 1; 
+    y = 1;
+    if (h.toString() == "Hex(0,-1,1)")
+    {
+        // all values default
+    }
+    else if (h.toString() == "Hex(1,-1,0)")
+    {
+        flipx = true;
+        x = -1; 
+    }
+    else if (h.toString() == "Hex(1,0,-1)")
+    {
+        img_id = "attack";
+        x = -1; 
+        y = 0;
+    }
+    else if (h.toString() == "Hex(0,1,-1)")
+    {
+        x = -1; 
+        y = -1;
+        flipx = true;
+        flipy = true;
+    }
+    else if (h.toString() == "Hex(-1,1,0)")
+    {
+        y = -1; 
+        flipy = true;
+    }
+    else if (h.toString() == "Hex(-1,0,1)")
+    {
+        y = 0;
+        img_id = "attack";
+        flipx = true;
+    }
+    else
+    {
+        console.log(h);
+        throw("bogus");
+    }
+    return [img_id, flipx, flipy, x, y];
+}
 
 export class Unit extends Phaser.GameObjects.Image 
 {
@@ -25,7 +74,17 @@ export class Unit extends Phaser.GameObjects.Image
         this.move_range = type == "cavalry" ? 5 : 3;
 
         this.scene.events.on(events.end_turn, this.handleTurnEnd, this);
-        this.scene.events.on(events.player_bankrupt, this.die, this);
+        this.scene.events.on(events.player_bankrupt, this.bankrupcyCheck, this);
+    }
+
+    bankrupcyCheck(player_id)
+    {
+        if (player_id == this.owner_id)
+        {
+            var s = this.scene;
+            this.die();
+            s.events.emit(events.recalc_territories);
+        }
     }
 
     handlePointerDown()
@@ -57,45 +116,122 @@ export class Unit extends Phaser.GameObjects.Image
 
         var possible_destinations = [this.hex];
         var possible_paths = new Map([[this.hex.toString(), []]]);
-        var pf = new aStar(valid_positions);
+        var dest_is_attack = new Map([[this.hex.toString(), false]]);
+        var pf = new aStar(valid_positions, true);
         hexLib.hex_spiral(this.hex, this.move_range+1).forEach(function(h)
         {
-            if (this.scene.occupied.has(h.toString()))
+            var is_attack = false;
+            if (!this.scene.world_string_set.has(h.toString()))
                 return;
+            if (this.scene.occupied.has(h.toString()))
+            {
+                if (this.scene.occupied.get(h.toString()).owner_id != this.owner_id)
+                    is_attack = true;
+                else
+                    return;
+            }
             var path = pf.findPath(this.hex, h);
             if (path.length > 0 && path.length <= this.move_range)
             {
                 possible_destinations.push(h);
                 possible_paths.set(h.toString(), path);
+                dest_is_attack.set(h.toString(), is_attack);
             }
         }, this);
 
+        var previous_hex = new hexLib.Hex(0,0,0);
         var flats = [];
+        var inds = [];
         possible_destinations.forEach(function(h)
         {
+            var is_attack = dest_is_attack.get(h.toString());
             p = hexLib.hex_to_pixel(hex_layout, h);
             var flat = this.scene.add.image(p.x, p.y, 'hex_flat').setInteractive(this.scene.input.makePixelPerfect(1));
             flat.setBlendMode(Phaser.BlendModes.ADD);
+            if (is_attack)
+            {
+                flat.setTint(red);
+                var ind = this.scene.add.image(p.x, p.y, "Attack");
+                var ind_original_pos = {x:p.x, y:p.y};
+                inds.push(ind);
+                ind.setVisible(false);
+                var col = this.scene.player_colours[this.owner_id];
+                ind.setTint(col);
+                ind.depth = 2;
+                flat.on('pointerover', function(pointer, localx, localy, event)
+                {
+                    var diff = hexLib.hex_subtract(h, previous_hex);
+                    [img_id, flipx, flipy, x, y] = get_attack_indication(diff);
+
+                    this.scene.tweens.killTweensOf(ind);
+                    ind.setPosition(ind_original_pos.x, ind_original_pos.y);
+                    this.scene.tweens.add({
+                        targets: ind,
+                        ease: 'Cubic',
+                        duration: 300,
+                        x: "+="+2*x.toString(),
+                        y: "+="+2*y.toString(),
+                        repeat: -1,
+                        onComplete: function()
+                        {
+                            ind.setPosition(ind_original_pos.x, ind_original_pos.y);
+                        }
+                    });
+                    var tween;
+                    tween = this.scene.tweens.addCounter({
+                        from: 0,
+                        to: 1,
+                        ease: 'Linear',
+                        duration: 300,
+                        onUpdate: function()
+                        {
+                            ind.setTint(lerpColour(col, red, tween.getValue()));
+                        },
+                        yoyo: true,
+                        repeat: -1
+                    }, this);
+                    var img_id, flipx, flipy, x, y;
+                    ind.setTexture(img_id);
+                    ind.setFlipX(flipx);
+                    ind.setFlipY(flipy);
+                    ind.setVisible(true);
+                }, this);
+                flat.on('pointerout', function(pointer, localx, localy, event)
+                {
+                    ind.setVisible(false);
+                }, this);
+                this.scene.events.on(events.hexout, function(hex)
+                {
+                    if (hex.toString() == h.toString())
+                        ind.setVisible(false);
+                }, this);
+            }
+            flat.on('pointerover', function(pointer, localx, localy, event)
+            {
+                if (!is_attack)
+                    previous_hex = h;
+            }, this);
             flat.on('pointerdown', function(pointer, localx, localy, event)
             {
                 p = this.scene.cameras.main.getWorldPoint(pointer.x, pointer.y);
                 h = hexLib.hex_round(hexLib.pixel_to_hex(hex_layout, p));
                 p = hexLib.hex_to_pixel(hex_layout, h);
-                this.scene.occupied.set(h.toString(), this);
                 this.scene.registry.set(events.is_placing_unit, false);
                 this.scene.registry.set(events.unit_to_place, null);
                 utp.destroy();
+                inds.map(f => f.destroy());
                 flats.map(f => f.destroy());
                 // lerp into position along path
-                this.moveTo(h, possible_paths.get(h.toString()));
-                this.scene.events.emit(events.recalc_territories);
+                this.moveTo(h, possible_paths.get(h.toString()), is_attack);
                 // todo have attack anim and UI
                 event.stopPropagation();
             }, this);
             flat.setAlpha(0.01);
             this.scene.tweens.add({
+                start: 0,
+                end: 1,
                 targets: flat,
-                ease: 'Linear',
+                ease: 'Quad.InOut',
                 duration: 600,
                 repeat: -1,
                 yoyo: true,
@@ -105,7 +241,7 @@ export class Unit extends Phaser.GameObjects.Image
         }, this);
     }
 
-    moveTo(h, path)
+    moveTo(h, path, is_attack)
     {
         this.can_move = h.toString() == this.hex.toString();
         this.hex = h;
@@ -117,24 +253,65 @@ export class Unit extends Phaser.GameObjects.Image
             path = path.reverse();
 
             var i = 0;
-            path.forEach(function(h)
+            path.forEach(function(ph)
             {
-                var p = hexLib.hex_to_pixel(hex_layout, h);
-                this.scene.tweens.add({
-                    targets: this,
-                    ease: "Cubic",
-                    duration: 120,
-                    delay: 120*i,
-                    x: p.x,
-                    y: p.y
-                });
+                var p = hexLib.hex_to_pixel(hex_layout, ph);
+                if (is_attack && (i == path.length-1))
+                    return;
+                else
+                    this.scene.tweens.add({
+                        targets: this,
+                        ease: "Cubic",
+                        duration: 120,
+                        delay: 120*i,
+                        x: p.x,
+                        y: p.y
+                    });
                 i++;
             }, this);
         }
-        // grey out after move
-        var tween;
+
+        // hitstop
+        if (is_attack)
+        {
+            var h_penult = path[path.length-2];
+            var h_ult = path[path.length-1];
+            var p_penult = hexLib.hex_to_pixel(hex_layout, h_penult);
+            var p_ult = hexLib.hex_to_pixel(hex_layout, h_ult);
+
+            var diff = hexLib.hex_subtract(h_ult, h_penult);
+            var img_id, flipx, flipy, x, y;
+            [img_id, flipx, flipy, x, y] = get_attack_indication(diff);
+
+            i++;
+            this.scene.tweens.add({
+                targets: this,
+                ease: "Quadratic.easeOut",
+                duration: 240,
+                delay: 120*i,
+                x: "+="+(x*4).toString(),
+                y: "+="+(y*4).toString(),
+                onComplete: function()
+                {
+                    this.scene.occupied.get(h_ult.toString()).die();
+                },
+                onCompleteScope: this
+            }, this);
+            i += 2;
+            this.scene.tweens.add({
+                targets: this,
+                ease: "Quintic",
+                duration: 120,
+                delay: 120*i,
+                x: p_ult.x,
+                y: p_ult.y
+            });
+            i++;
+        }
+
         this.scene.time.delayedCall(120*i, function()
         {
+            var tween;
             tween = this.scene.tweens.addCounter({
                 from: 0,
                 to: 1,
@@ -146,6 +323,8 @@ export class Unit extends Phaser.GameObjects.Image
                 },
                 onUpdateScope: this
             });
+            this.scene.occupied.set(h.toString(), this);
+            this.scene.events.emit(events.recalc_territories);
         }, [], this);
         this.scene.tweens.add({
             targets: this,
@@ -160,7 +339,6 @@ export class Unit extends Phaser.GameObjects.Image
     {
         if (! this.can_move)
         {
-            // grey out after move
             var tween;
             var speed = getRandomFloat(0.5, 1.5);
             tween = this.scene.tweens.addCounter({
@@ -184,11 +362,9 @@ export class Unit extends Phaser.GameObjects.Image
         this.can_move = true;
     }
 
-    die(player_id)
+    die()
     {
-        if (player_id != this.owner_id) 
-            return;
-        var initial_duration =  getRandomInt(150, 450);
+        var initial_duration = getRandomInt(150, 450);
         range(1, 32).forEach(function(i)
         {
             if (exclude_death_pixel.get(this.type).has(i))
@@ -201,7 +377,7 @@ export class Unit extends Phaser.GameObjects.Image
             var starting_vec = death_pixel_dirc.get(str);
             var x = starting_vec[0] + getRandomFloat(-1,1);
             var y = starting_vec[1] + getRandomFloat(-1,1);
-            var power = getRandomInt(1, 20);
+            var power = getRandomInt(1, 15);
             var duration = getRandomInt(300, 3000);
             this.scene.tweens.add({
                 targets: pixel,
@@ -220,10 +396,25 @@ export class Unit extends Phaser.GameObjects.Image
                 duration: initial_duration,
                 ease: "Expo"
             }, this);
+            var tween;
+            var col = this.scene.player_colours[this.owner_id];
+            tween = this.scene.tweens.addCounter({
+                from: 0,
+                to: 1,
+                ease: 'Expo',
+                duration: duration,
+                delay: initial_duration,
+                onUpdate: function()
+                {
+                    pixel.setTint(lerpColour(black, col, tween.getValue()));
+                },
+                onUpdateScope: this
+            }, this);
         }, this);
+        this.scene.occupied.delete(this.hex.toString());
         this.scene.events.emit(events.unit_death, this)
-        this.scene.events.off(events.player_bankrupt, this.die);
-        this.scene.events.off(events.end_turn, this.handleTurnEnd);
+        this.scene.events.off(events.player_bankrupt, this.bankrupcyCheck, this);
+        this.scene.events.off(events.end_turn, this.handleTurnEnd, this);
         this.destroy();
     }
 }

@@ -58,7 +58,11 @@ export class Capitol extends Phaser.GameObjects.Image
         {
             img.on('pointerdown', function(pointer, localx, localy, event)
             {
-                this.scene.events.emit(events.recruit_attempt, unit_map.get(img), this.owner_id);
+                //DEBUG: let's recruit some enemy units
+                if (this.owner_id == 0)
+                    this.scene.events.emit(events.recruit_attempt, unit_map.get(img), this.owner_id);
+                else
+                    this.scene.events.emit(events.recruit, unit_map.get(img), this.owner_id);
                 event.stopPropagation();
             }, this);
 
