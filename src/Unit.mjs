@@ -1,8 +1,55 @@
 import {aStar} from "./misc/aStar.mjs";
 import {hex_layout, grey, black, red, exclude_death_pixel, death_pixel_dirc} from "./misc/constants.mjs";
+import {recruit_sword, recruit_cavalry, recruit_pike, recruit_musket} from "./misc/events.mjs";
 import {lerpColour, getRandomFloat, range, getRandomInt} from "./misc/utilities.mjs";
 import * as hexLib from "./misc/hex-functions.mjs";
 import * as events from "./misc/events.mjs";
+
+
+const victory = "victory";
+const defeat = "defeat";
+const draw = "draw";
+
+function combat_result(a, b)
+{
+    if (a.type == recruit_musket)
+        return victory;
+    if (b.type == recruit_musket)
+        return victory;
+    if (a.type == recruit_sword)
+    {
+        if (b.type == recruit_sword)
+            return draw;
+        if (b.type == recruit_pike)
+            return victory;
+        if (b.type == recruit_cavalry)
+            return defeat;
+    }
+    else if (a.type == recruit_pike)
+    {
+        if (b.type == recruit_pike)
+            return draw;
+        if (b.type == recruit_cavalry)
+            return victory;
+        if (b.type == recruit_sword)
+            return defeat;
+    }
+    else if (a.type == recruit_cavalry)
+    {
+        if (b.type == recruit_cavalry)
+            return draw;
+        if (b.type == recruit_sword)
+            return victory;
+        if (b.type == recruit_pike)
+            return defeat;
+    }
+    else
+    {
+        console.log(a.type);
+        throw("bogus unit type");
+    }
+}
+
 
 function get_attack_indication(h)
 {
@@ -48,7 +95,7 @@ function get_attack_indication(h)
     else
     {
         console.log(h);
-        throw("bogus");
+        throw("bogus attack direction");
     }
     return [img_id, flipx, flipy, x, y];
 }
@@ -71,7 +118,7 @@ export class Unit extends Phaser.GameObjects.Image
         this.hex = hex;
         this.can_move = type != "capitol";
 
-        this.move_range = type == "cavalry" ? 5 : 3;
+        this.move_range = type == "cavalry" ? 6 : 4;
 
         this.scene.events.on(events.end_turn, this.handleTurnEnd, this);
         this.scene.events.on(events.player_bankrupt, this.bankrupcyCheck, this);
@@ -82,7 +129,7 @@ export class Unit extends Phaser.GameObjects.Image
         if (player_id == this.owner_id)
         {
             var s = this.scene;
-            this.die();
+            this.die(true);
             s.events.emit(events.recalc_territories);
         }
     }
@@ -246,8 +293,12 @@ export class Unit extends Phaser.GameObjects.Image
         this.can_move = h.toString() == this.hex.toString();
         this.hex = h;
 
+        // put us back in place
         if (this.can_move)
+        {
+            this.scene.occupied.set(h.toString(), this);
             return;
+        }
         if (path.length > 0)
         {
             path = path.reverse();
@@ -279,9 +330,11 @@ export class Unit extends Phaser.GameObjects.Image
             var p_penult = hexLib.hex_to_pixel(hex_layout, h_penult);
             var p_ult = hexLib.hex_to_pixel(hex_layout, h_ult);
 
+            var enemy = this.scene.occupied.get(h_ult.toString());
             var diff = hexLib.hex_subtract(h_ult, h_penult);
             var img_id, flipx, flipy, x, y;
             [img_id, flipx, flipy, x, y] = get_attack_indication(diff);
+            var mid_p = {x: p_penult.x/2 + p_ult.x/2, y: p_penult.y/2 + p_ult.y/2};
 
             i++;
             this.scene.tweens.add({
@@ -290,12 +343,15 @@ export class Unit extends Phaser.GameObjects.Image
                 duration: 240,
                 delay: 120*i,
                 x: "+="+(x*4).toString(),
-                y: "+="+(y*4).toString(),
-                onComplete: function()
-                {
-                    this.scene.occupied.get(h_ult.toString()).die();
-                },
-                onCompleteScope: this
+                y: "+="+(y*4).toString()
+            }, this);     
+            this.scene.tweens.add({
+                targets: enemy,
+                ease: "Quadratic.easeOut",
+                duration: 240,
+                delay: 120*i,
+                x: "-="+(x*4).toString(),
+                y: "-="+(y*4).toString()
             }, this);
             i += 2;
             this.scene.tweens.add({
@@ -303,34 +359,158 @@ export class Unit extends Phaser.GameObjects.Image
                 ease: "Quintic",
                 duration: 120,
                 delay: 120*i,
-                x: p_ult.x,
-                y: p_ult.y
-            });
+                x: mid_p.x + x*4,
+                y: mid_p.y + y*4,
+            }, this);         
+            this.scene.tweens.add({
+                targets: enemy,
+                ease: "Quintic",
+                duration: 120,
+                delay: 120*i,
+                x: mid_p.x - x*4,
+                y: mid_p.y - y*4
+            }, this);
             i++;
+            var result = combat_result(this, enemy);
+            if (result == victory)
+            {
+                this.scene.tweens.add({
+                    targets: this,
+                    ease: "Quintic",
+                    duration: 120,
+                    delay: 120*i,
+                    x: p_ult.x,
+                    y: p_ult.y,
+                    onComplete: function()
+                    {
+                        enemy.die(false);
+                        this.scene.occupied.set(h.toString(), this);
+                        this.scene.events.emit(events.recalc_territories);
+                    },
+                    onCompleteScope: this
+                });
+                i++;
+            }
+            else if (result == defeat)
+            {
+                this.scene.tweens.add({
+                    targets: enemy,
+                    ease: "Quintic",
+                    duration: 120,
+                    delay: 120*i,
+                    x: p_ult.x,
+                    y: p_ult.y,
+                    onComplete: function()
+                    {
+                        var world = this.scene;
+                        this.die(false);
+                        world.events.emit(events.recalc_territories);
+                        enemy.greyOut(0);
+                        enemy.can_move = false;
+                    },
+                    onCompleteScope: this
+                });   
+                return;
+            }
+            else // draw
+            {
+                this.scene.tweens.add({
+                    targets: this,
+                    ease: "Linear",
+                    duration: 120,
+                    delay: 120*i,
+                    x: mid_p.x + x*8,
+                    y: mid_p.y + y*8,
+                }, this);         
+                this.scene.tweens.add({
+                    targets: enemy,
+                    ease: "Linear",
+                    duration: 120,
+                    delay: 120*i,
+                    x: mid_p.x,
+                    y: mid_p.y
+                }, this);
+                i++;
+
+                this.scene.tweens.add({
+                    targets: this,
+                    ease: "Linear",
+                    duration: 120,
+                    delay: 120*i,
+                    x: mid_p.x,
+                    y: mid_p.y,
+                }, this);         
+                this.scene.tweens.add({
+                    targets: enemy,
+                    ease: "Linear",
+                    duration: 120,
+                    delay: 120*i,
+                    x: mid_p.x - x*8,
+                    y: mid_p.y - y*8
+                }, this);
+                i++;
+
+                this.scene.tweens.add({
+                    targets: this,
+                    ease: "Quadratic",
+                    duration: 120,
+                    delay: 120*i,
+                    x: p_penult.x,
+                    y: p_penult.y,
+                });
+                this.scene.tweens.add({
+                    targets: enemy,
+                    ease: "Quadratic",
+                    duration: 120,
+                    delay: 120*i,
+                    x: p_ult.x,
+                    y: p_ult.y,
+                    onComplete: function()
+                    {
+                        this.hex = h_penult;
+                        this.scene.occupied.set(h_penult.toString(), this);
+                        this.scene.events.emit(events.recalc_territories);
+                        enemy.greyOut(0);
+                        enemy.can_move = false;
+                    },
+                    onCompleteScope: this
+                });
+                i ++;
+            }
+        }
+        else
+        {
+            this.scene.time.delayedCall(120*i, function()
+            {
+                this.scene.occupied.set(h.toString(), this);
+                this.scene.events.emit(events.recalc_territories);
+            }, [], this);
         }
 
-        this.scene.time.delayedCall(120*i, function()
-        {
-            var tween;
-            tween = this.scene.tweens.addCounter({
-                from: 0,
-                to: 1,
-                ease: 'Linear',
-                duration: 600,
-                onUpdate: function()
-                {
-                    this.setTint(lerpColour(black, grey, tween.getValue()));
-                },
-                onUpdateScope: this
-            });
-            this.scene.occupied.set(h.toString(), this);
-            this.scene.events.emit(events.recalc_territories);
-        }, [], this);
+        this.greyOut(120*i);
+    }
+
+    greyOut(delay)
+    {
+        // grey out and move down
+        var tween;
+        tween = this.scene.tweens.addCounter({
+            from: 0,
+            to: 1,
+            ease: 'Linear',
+            duration: 600,
+            delay: delay,
+            onUpdate: function()
+            {
+                this.setTint(lerpColour(black, grey, tween.getValue()));
+            },
+            onUpdateScope: this,
+        });
         this.scene.tweens.add({
             targets: this,
             ease: "Linear",
             duration: 600,
-            delay: 120*i,
+            delay: delay,
             y: "+=2"
         });
     }
@@ -362,9 +542,9 @@ export class Unit extends Phaser.GameObjects.Image
         this.can_move = true;
     }
 
-    die()
+    die(bankrupcy)
     {
-        var initial_duration = getRandomInt(150, 450);
+        var initial_duration = bankrupcy ? getRandomInt(150, 450) : 0;
         range(1, 32).forEach(function(i)
         {
             if (exclude_death_pixel.get(this.type).has(i))
@@ -379,6 +559,14 @@ export class Unit extends Phaser.GameObjects.Image
             var y = starting_vec[1] + getRandomFloat(-1,1);
             var power = getRandomInt(1, 15);
             var duration = getRandomInt(300, 3000);
+            if (bankrupcy)
+                this.scene.tweens.add({
+                    targets: pixel,
+                    x: "-="+starting_vec[0].toString(),
+                    y: "-="+starting_vec[1].toString(),
+                    duration: initial_duration,
+                    ease: "Expo"
+                }, this);
             this.scene.tweens.add({
                 targets: pixel,
                 x: "+="+(x*power).toString(),
@@ -388,13 +576,6 @@ export class Unit extends Phaser.GameObjects.Image
                 alpha: 0,
                 ease: "Cubic",
                 onComplete: function() {pixel.destroy()}
-            }, this);
-            this.scene.tweens.add({
-                targets: pixel,
-                x: "-="+starting_vec[0].toString(),
-                y: "-="+starting_vec[1].toString(),
-                duration: initial_duration,
-                ease: "Expo"
             }, this);
             var tween;
             var col = this.scene.player_colours[this.owner_id];

@@ -3,6 +3,8 @@ BUGS:
 Bankrupcy mass die off can happen in an order which will leave upkeep UI in an incorrect state
     - refactor UIScene to listen for registry events instead
 Units unselectable after being told to remain in place
+After draw the initiating unit's hex stays occupied after movement
+Movement animation going through water in bottlenecks / pathing through enemies
 
 TODO:
 =============

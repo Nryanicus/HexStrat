@@ -18,6 +18,10 @@ export class MasterScene extends Phaser.Scene
         var ui = this.scene.get('ui');
         ui.setWorld(world);
 
+        this.input.keyboard.on('keydown-X', function (event) 
+        {
+            console.log(world.occupied);
+        }, this);
         this.input.keyboard.on('keydown-Z', function (event) 
         {
             if (this.registry.get(events.can_gen))
@@ -27,7 +31,7 @@ export class MasterScene extends Phaser.Scene
                 this.scene.remove('world');
                 this.scene.add('world', WorldScene, true);
                 this.scene.moveBelow('world', "ui");
-                var world = this.scene.get('world');
+                world = this.scene.get('world');
                 ui.setWorld(world);
             }
         }, this);
