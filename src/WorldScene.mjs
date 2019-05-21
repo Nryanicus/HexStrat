@@ -35,7 +35,16 @@ export class WorldScene extends Phaser.Scene
         this.load.image('capitol', 'res/Capitol.png');
 
         this.load.image('purchase', 'res/Purchase.png');
-        this.load.image('purchase_select', 'res/PurchaseSelection.png');
+        this.load.image('purchase_options', 'res/PurchaseOptions.png');
+        this.load.image('purchase_sword_select', 'res/PurchaseSwordSelect.png');
+        this.load.image('purchase_sword_glow', 'res/PurchaseSwordGlow.png');
+        this.load.image('purchase_pike_select', 'res/PurchasePikeSelect.png');
+        this.load.image('purchase_pike_glow', 'res/PurchasePikeGlow.png');
+        this.load.image('purchase_cavalry_select', 'res/PurchaseCavalrySelect.png');
+        this.load.image('purchase_cavalry_glow', 'res/PurchaseCavalryGlow.png');
+        this.load.image('purchase_musket_select', 'res/PurchaseMusketSelect.png');
+        this.load.image('purchase_musket_glow', 'res/PurchaseMusketGlow.png');
+
         this.load.image('hex_select', 'res/HexOutlineBlur.png');
         this.load.image('hex_flat', 'res/HexGlow.png');
 

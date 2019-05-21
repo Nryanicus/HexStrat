@@ -28,32 +28,40 @@ export class Capitol extends Phaser.GameObjects.Image
         var menu_background = this.scene.add.image(0, 0, 'purchase');
         menu_background.setTint(this.colour);
 
-        var sword = this.scene.add.image(0, -24, 'sword').setInteractive({pixelPerfect:true});
-        var pike = this.scene.add.image(0, -8, 'pike').setInteractive({pixelPerfect:true});
-        var cavalry = this.scene.add.image(0, 8, 'cavalry').setInteractive({pixelPerfect:true});
-        var musket = this.scene.add.image(0, 24, 'musket').setInteractive({pixelPerfect:true});
-        var purchase_select = this.scene.add.image(0,0, 'purchase_select');
+        var sword = this.scene.add.image(0, 0, 'purchase_sword_select').setInteractive(this.scene.input.makePixelPerfect(1));
+        var pike = this.scene.add.image(0, 0, 'purchase_pike_select').setInteractive(this.scene.input.makePixelPerfect(1));
+        var cavalry = this.scene.add.image(0, 0, 'purchase_cavalry_select').setInteractive(this.scene.input.makePixelPerfect(1));
+        var musket = this.scene.add.image(0, 0, 'purchase_musket_select').setInteractive(this.scene.input.makePixelPerfect(1));
+        var sword_glow = this.scene.add.image(0,0, 'purchase_sword_glow');
+        var pike_glow = this.scene.add.image(0,0, 'purchase_pike_glow');
+        var cavalry_glow = this.scene.add.image(0,0, 'purchase_cavalry_glow');
+        var musket_glow = this.scene.add.image(0,0, 'purchase_musket_glow');
+        var menu_options = this.scene.add.image(0, 0, 'purchase_options');
 
-        this.menu.add([menu_background, purchase_select, sword, pike, cavalry, musket]);
+        this.menu.add([menu_background, sword_glow, pike_glow, cavalry_glow, musket_glow, menu_options, sword, pike, cavalry, musket]);
 
         this.menu.setVisible(false);
         this.menu.setActive(false);
-        purchase_select.setVisible(false);
-        purchase_select.setAlpha(0.75);
-        purchase_select.setBlendMode(Phaser.BlendModes.ADD);
-        this.scene.tweens.add({
-            targets: purchase_select,
-            ease: 'Linear',
-            duration: 600,
-            repeat: -1,
-            yoyo: true,
-            alpha: 1
-        });
+        var glows = [sword_glow, pike_glow, cavalry_glow, musket_glow];
+        glows.forEach(function(g)
+        {
+            g.setVisible(false);
+            g.setAlpha(0.5);
+            g.setBlendMode(Phaser.BlendModes.ADD);
+            this.scene.tweens.add({
+                targets: g,
+                ease: 'Sine',
+                duration: 600,
+                repeat: -1,
+                yoyo: true,
+                alpha: 1
+            });
+        }, this);
 
         // purchasing
         var unit_options = [sword, pike, cavalry, musket];
-        unit_options.forEach(function(img){img.setTint(black)});
-        var unit_map = new Map([[sword,events.recruit_sword], [cavalry,events.recruit_cavalry], [pike,events.recruit_pike], [musket,events.recruit_musket]]);
+        var unit_map = new Map([[sword, events.recruit_sword], [cavalry, events.recruit_cavalry], [pike, events.recruit_pike], [musket, events.recruit_musket]]);
+        var glow_map = new Map([[sword, sword_glow], [cavalry, cavalry_glow], [pike, pike_glow], [musket, musket_glow]]);
         unit_options.forEach(function(img)
         {
             img.on('pointerdown', function(pointer, localx, localy, event)
@@ -68,14 +76,16 @@ export class Capitol extends Phaser.GameObjects.Image
 
             img.on('pointerover', function()
             {
-                purchase_select.setVisible(true);
-                purchase_select.setPosition(img.x, img.y);
+                glows.forEach(function(g)
+                {
+                    g.setVisible(g == glow_map.get(img));
+                });
                 this.scene.registry.set(events.cursor_outside_menu, false);
                 this.scene.events.emit(events.hide_hex_cursor);
             }, this);
             img.on('pointerout', function()
             {
-                purchase_select.setVisible(false);
+                glow_map.get(img).setVisible(false);
                 this.scene.registry.set(events.cursor_outside_menu, false);
                 this.scene.events.emit(events.hide_hex_cursor);
             }, this);
