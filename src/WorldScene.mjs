@@ -88,7 +88,7 @@ export class WorldScene extends Phaser.Scene
         this.load.image('dead30', 'res/UnitDeathPixel30.png');
         this.load.image('dead31', 'res/UnitDeathPixel31.png');
     }
-
+    
     create()
     {
         var controlConfig = {

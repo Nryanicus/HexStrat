@@ -13,13 +13,14 @@ export const recruit_sword = "sword";
 export const recruit_cavalry = "cavalry";
 export const recruit_pike = "pike";
 export const recruit_musket = "musket";
-export const cancel_recruitment = "cancel_recruitment";
+export const cancel_recruitment = "cancel_recruitment"; // player_id, unit_type
  
 export const end_turn = "end_turn";
 
 export const territory_change = "territory_change";
 export const recalc_territories = "recalc_territories";
 export const player_bankrupt = "player_bankrupt"; // player_id
+export const shake_treasury = "shake_treasury"; // player_id
 export const unit_death = "unit_death"; // unit
 
 // registry keys

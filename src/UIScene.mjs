@@ -17,6 +17,8 @@ export class UIScene extends Phaser.Scene
         this.background;
 
         this.original_positions = new Map();
+
+        this.tween_map = new Map();
     }
 
     preload()
@@ -65,7 +67,7 @@ export class UIScene extends Phaser.Scene
             from: from,
             to: to,
             ease: 'Quadratic',
-            duration: 10,
+            duration: 30*diff,
             onUpdate: function()
             {
                 var n = Math.floor(tween.getValue());
@@ -77,7 +79,7 @@ export class UIScene extends Phaser.Scene
         if (to == from)
             return;
         var mod = (to - from < 0) ? "+" : "-";
-        this.tweens.add(
+        var tween2 = this.tweens.add(
         {
             targets: target,
             ease: 'Cubic',
@@ -100,8 +102,8 @@ export class UIScene extends Phaser.Scene
             onCompleteScope: this
         }, this);
 
-        var tween2;
-        tween2 = this.tweens.addCounter({
+        var tween3;
+        tween3 = this.tweens.addCounter({
             from: 0,
             to: 1,
             ease: 'Quadratic',
@@ -109,10 +111,12 @@ export class UIScene extends Phaser.Scene
             yoyo: true,
             onUpdate: function()
             {
-                target.setTint(lerpColour(this.colour, white, tween2.getValue()));
+                target.setTint(lerpColour(this.colour, white, tween3.getValue()));
             },
             onUpdateScope: this
         }, this);
+
+        this.tween_map.set(target, [tween, tween2, tween3]);
     }
 
     initUI()
@@ -131,15 +135,15 @@ export class UIScene extends Phaser.Scene
         var musket_select = this.add.image(0, 0, "musket_select");;
         var end_turn_select = this.add.image(0, 0, "end_turn_select");;
         
-        this.treasury = this.add.bitmapText(558, -10, 'font').setOrigin(1, 0.5);
+        this.treasury = this.add.bitmapText(552, -10, 'font').setOrigin(1, 0.5);
         this.treasury.setScale(2, 2);
         this.treasury.setLetterSpacing(2);
         this.original_positions.set(this.treasury, -10);
-        this.income = this.add.bitmapText(558, 18, 'font').setOrigin(1, 0.5);
+        this.income = this.add.bitmapText(552, 18, 'font').setOrigin(1, 0.5);
         this.income.setScale(2, 2);
         this.income.setLetterSpacing(2);
         this.original_positions.set(this.income, 18);
-        this.upkeep = this.add.bitmapText(558, 46, 'font').setOrigin(1, 0.5);
+        this.upkeep = this.add.bitmapText(552, 46, 'font').setOrigin(1, 0.5);
         this.upkeep.setScale(2, 2);
         this.upkeep.setLetterSpacing(2);
         this.original_positions.set(this.upkeep, 46);
@@ -198,128 +202,62 @@ export class UIScene extends Phaser.Scene
             this.ui.setPosition(this.cameras.main.width/2, this.cameras.main.height - 16 - this.height/2 + this.height*2);
         }, this);
 
-        // TODO, move the logic here into a dedicated simulator class and have this just be an observer
-        this.world.events.on(events.recruit_attempt, function(type, player_id)
-        {
-            if (player_id != this.player_id || this.registry.get(events.is_placing_unit))
-                return;
-            var t = this.registry.get("treasury"+player_id.toString());
-
-            // can't afford, shake treasury and return
-            if (unit_cost.get(type) > t)
-            {
-                var tween;
-                tween = this.tweens.addCounter({
-                    from: 0,
-                    to: 1,
-                    ease: 'Quadratic',
-                    duration: 300,
-                    yoyo: true,
-                    onUpdate: function()
-                    {
-                        this.treasury.setTint(lerpColour(this.colour, red, tween.getValue()));
-                    },
-                    onUpdateScope: this
-                }, this);
-                this.tweens.add(
-                {
-                    targets: this.treasury,
-                    ease: 'Quintic',
-                    duration: 75,
-                    yoyo: true,
-                    x: "+=2"
-                }, this);
-                this.tweens.add(
-                {
-                    targets: this.treasury,
-                    delay: 150,
-                    ease: 'Quintic',
-                    duration: 75,
-                    yoyo: true,
-                    x: "-=2"
-                }, this);
-                return;
-            }
-
-            this.world.events.emit(events.recruit, type, player_id);
-        }, this);
-
-        this.world.events.on(events.recruit, function(type, player_id)
+        this.events.on(events.shake_treasury, function(player_id)
         {
             if (player_id != this.player_id)
                 return;
-            var t = this.registry.get("treasury"+player_id.toString());
-            var curr_t = t;
-            var cost = unit_cost.get(type);
-            t -= cost;
-            this.registry.set("treasury"+player_id.toString(), t);
-            this.lerpNumericText(this.treasury, curr_t, t);
-
-            var up = this.registry.get("upkeep"+player_id.toString());
-            var curr_up = up;
-            up += cost;
-            this.registry.set("upkeep"+player_id.toString(), up);
-            this.lerpNumericText(this.upkeep, curr_up, up);
-        }, this);
-
-        this.world.events.on(events.territory_change, function()
-        {   
-            var current = this.registry.get("income"+this.player_id.toString());
-            var i = 0;
-            this.world.territories.forEach(function(owner_id, string, map)
-            {
-                if (owner_id == this.player_id)
-                    i++;
+            var tween;
+            tween = this.tweens.addCounter({
+                from: 0,
+                to: 1,
+                ease: 'Quadratic',
+                duration: 300,
+                yoyo: true,
+                onUpdate: function()
+                {
+                    this.treasury.setTint(lerpColour(this.colour, red, tween.getValue()));
+                },
+                onUpdateScope: this
             }, this);
-            this.registry.set("income"+this.player_id.toString(), i);
-            this.lerpNumericText(this.income, current, i);
+            this.tweens.add(
+            {
+                targets: this.treasury,
+                ease: 'Quintic',
+                duration: 75,
+                yoyo: true,
+                x: "+=2"
+            }, this);
+            this.tweens.add(
+            {
+                targets: this.treasury,
+                delay: 150,
+                ease: 'Quintic',
+                duration: 75,
+                yoyo: true,
+                x: "-=2"
+            }, this);
         }, this);
 
-        this.world.events.on(events.end_turn, function()
-        {   
-            var t = this.registry.get("treasury"+this.player_id.toString());
-            var curr_t = t;
-            var inc = this.registry.get("income"+this.player_id.toString());
-            var up = this.registry.get("upkeep"+this.player_id.toString());
-            t += inc - up;
-            this.registry.set("treasury"+this.player_id.toString(), t);
-            this.lerpNumericText(this.treasury, curr_t, t);
-
-            if (t < 0)
-                this.world.events.emit(events.player_bankrupt, this.player_id);
-        }, this);
-
-        // reduce upkeep of slain unit
-        this.world.events.on(events.unit_death, function (unit) 
+        this.registry.events.on("changedata-treasury"+this.player_id.toString(), function(parent, value, previous_value)
         {
-            if (unit.owner_id != this.player_id)
-                return;
-
-            var up = this.registry.get("upkeep"+this.player_id.toString());
-            var curr_up = up;
-            up -= unit_cost.get(unit.type);
-            this.registry.set("upkeep"+this.player_id.toString(), up);
-            this.lerpNumericText(this.upkeep, curr_up, up);
+            if (this.tween_map.has(this.treasury))
+                this.tween_map.get(this.treasury).map(t => t.remove());
+            this.tween_map.delete(this.treasury);
+            this.lerpNumericText(this.treasury, previous_value, value);
         }, this);
-
-        // refund cancelled unit recruitment
-        this.world.events.on(events.cancel_recruitment, function(player_id, unit_type)
+        this.registry.events.on("changedata-income"+this.player_id.toString(), function(parent, value, previous_value)
         {
-            if (player_id != this.player_id)
-                return;
-
-            var up = this.registry.get("upkeep"+this.player_id.toString());
-            var curr_up = up;
-            up -= unit_cost.get(unit_type);
-            this.registry.set("upkeep"+this.player_id.toString(), up);
-            this.lerpNumericText(this.upkeep, curr_up, up);
-
-            var t = this.registry.get("treasury"+player_id.toString());
-            var curr_t = t;
-            var cost = unit_cost.get(unit_type);
-            t += cost;
-            this.registry.set("treasury"+player_id.toString(), t);
-            this.lerpNumericText(this.treasury, curr_t, t);
+            if (this.tween_map.has(this.income))
+                this.tween_map.get(this.income).map(t => t.remove());
+            this.tween_map.delete(this.income);
+            this.lerpNumericText(this.income, previous_value, value);
+        }, this);
+        this.registry.events.on("changedata-upkeep"+this.player_id.toString(), function(parent, value, previous_value)
+        {
+            if (this.tween_map.has(this.upkeep))
+                this.tween_map.get(this.upkeep).map(t => t.remove());
+            this.tween_map.delete(this.upkeep);
+            this.lerpNumericText(this.upkeep, previous_value, value);
         }, this);
 
     }

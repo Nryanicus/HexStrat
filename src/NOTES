@@ -1,11 +1,10 @@
 BUGS:
 =============
-Bankrupcy mass die off can happen in an order which will leave upkeep UI in an incorrect state
-    - refactor UIScene to listen for registry events instead
+
+HexCursor sometimes lags behind actual hex placement, leading to units visually being in the correct position (though logically correct)
 
 TODO:
 =============
-cancel recruitment somehow. Click on capitol?
 
 NOTES:
 =============
