@@ -200,12 +200,18 @@ export function determineTerritories(world, players, pathfinder)
         }
         var min_dist_player = -1;
 
-        // FIXME: need to check all closest units, not just two
-
         var closest = bh.extractMinimum();
         var second_closest = bh.extractMinimum();
+        var only_one_closest_single_player = true;
         // if the two closest units are equidistant and not on the same side then the hex is neutral
-        if (! (closest.key == second_closest.key && closest.value.player != second_closest.value.player))
+        while(closest.key == second_closest.key && only_one_closest_single_player)
+        {
+            only_one_closest_single_player = closest.value.player == second_closest.value.player;
+            if (bh.size() == 0)
+                break;
+            second_closest = bh.extractMinimum();
+        }
+        if (only_one_closest_single_player)
             min_dist_player = closest.value.player;
 
         closest_units.set(h.toString(), closest.value.unit_p); // doesn't matter if it's a neutral hex or not here, since it's just for graphics

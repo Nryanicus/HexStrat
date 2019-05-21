@@ -15,6 +15,7 @@ export class Capitol extends Phaser.GameObjects.Image
         this.setTexture("capitol");
         this.setPosition(x, y);
         this.depth = 1;
+        this.type = "duck";
 
         this.scene.events.on("close_menu", this.closeMenu, this);
 

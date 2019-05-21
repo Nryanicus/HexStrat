@@ -1,10 +1,11 @@
 BUGS:
 =============
-
-HexCursor sometimes lags behind actual hex placement, leading to units visually being in the correct position (though logically correct)
+world functions:: need to check all closest units, not just the first two found
 
 TODO:
 =============
+Juice: have enemy unit move up a single pixel when you move over next to them
+
 
 NOTES:
 =============

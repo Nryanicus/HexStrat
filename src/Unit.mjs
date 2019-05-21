@@ -1,5 +1,5 @@
 import {aStar} from "./misc/aStar.mjs";
-import {hex_layout, grey, black, red, white, exclude_death_pixel, death_pixel_dirc} from "./misc/constants.mjs";
+import {hex_layout, grey, black, red, white, exclude_death_pixel, death_pixel_dirc, capitol} from "./misc/constants.mjs";
 import {recruit_sword, recruit_cavalry, recruit_pike, recruit_musket} from "./misc/events.mjs";
 import {lerpColour, getRandomFloat, range, getRandomInt} from "./misc/utilities.mjs";
 import * as hexLib from "./misc/hex-functions.mjs";
@@ -9,6 +9,7 @@ import * as events from "./misc/events.mjs";
 const victory = "victory";
 const defeat = "defeat";
 const draw = "draw";
+const attack_capitol = "attack_cap";
 
 const BogusAttackDirection = "bogus attack direction";
 const BogusUnitType = "bogus unit type";
@@ -17,6 +18,8 @@ const one_normal = 0.7071067811865475;
 
 function combat_result(a, b)
 {
+    if (b.type == capitol)
+        return attack_capitol;
     if (a.type == recruit_musket && b.type == recruit_musket)
         return draw;
     if (a.type == recruit_musket)
@@ -355,8 +358,7 @@ export class Unit extends Phaser.GameObjects.Image
         [img_id, flipx, flipy, x, y] = get_attack_indication(diff);
         var mid_p = {x: p_penult.x/2 + p_ult.x/2, y: p_penult.y/2 + p_ult.y/2};
 
-
-        if (!enemy.can_move)
+        if (!enemy.type == capitol && enemy.can_move)
             enemy.standUp(120*i);
 
         i++;
@@ -395,6 +397,10 @@ export class Unit extends Phaser.GameObjects.Image
         }, this);
         i++;
         var result = combat_result(this, enemy);
+        if (result == attack_capitol)
+        {
+
+        }
         if (result == victory)
         {
             this.scene.tweens.add({

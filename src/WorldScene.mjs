@@ -88,7 +88,7 @@ export class WorldScene extends Phaser.Scene
         this.load.image('dead30', 'res/UnitDeathPixel30.png');
         this.load.image('dead31', 'res/UnitDeathPixel31.png');
     }
-    
+
     create()
     {
         var controlConfig = {
@@ -253,15 +253,6 @@ export class WorldScene extends Phaser.Scene
 
         // do input reading instead of events on the hex images themselves to ensure even if other
         // gameobjects are on top of the hex image it still goes through
-        // IMPORTANT: if we don't want this to trigger have the event listeners on top stopPropagation()
-        this.input.on("pointerdown", function(pointer)
-        {
-            var p = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
-            var h = hexLib.hex_round(hexLib.pixel_to_hex(hex_layout, p));
-            if (this.world_string_set.has(h.toString()))
-                this.events.emit(events.hexdown, h);
-        },this);
-
         this.input.on("pointermove", function(pointer)
         {
             var p = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
@@ -275,6 +266,16 @@ export class WorldScene extends Phaser.Scene
             else
                 this.events.emit(events.hide_hex_cursor, h);
         }, this);
+
+        // IMPORTANT: if we don't want this to trigger have the event listeners on top stopPropagation()
+        // ALSO IMPORTANT: hexdown needs to be triggered after hexover, or the hexcursor will lag behind in some events
+        this.input.on("pointerdown", function(pointer)
+        {
+            var p = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+            var h = hexLib.hex_round(hexLib.pixel_to_hex(hex_layout, p));
+            if (this.world_string_set.has(h.toString()))
+                this.events.emit(events.hexdown, h);
+        },this);
 
         // map interaction
         this.events.on(events.hexdown, function (hex) 
