@@ -1,5 +1,5 @@
 import {aStar} from "./misc/aStar.mjs";
-import {hex_layout, grey, black, red, exclude_death_pixel, death_pixel_dirc} from "./misc/constants.mjs";
+import {hex_layout, grey, black, red, white, exclude_death_pixel, death_pixel_dirc} from "./misc/constants.mjs";
 import {recruit_sword, recruit_cavalry, recruit_pike, recruit_musket} from "./misc/events.mjs";
 import {lerpColour, getRandomFloat, range, getRandomInt} from "./misc/utilities.mjs";
 import * as hexLib from "./misc/hex-functions.mjs";
@@ -17,6 +17,8 @@ const one_normal = 0.7071067811865475;
 
 function combat_result(a, b)
 {
+    if (a.type == recruit_musket && b.type == recruit_musket)
+        return draw;
     if (a.type == recruit_musket)
         return victory;
     if (b.type == recruit_musket)
@@ -172,6 +174,7 @@ export class Unit extends Phaser.GameObjects.Image
         var possible_destinations = [this.hex];
         var possible_paths = new Map([[this.hex.toString(), []]]);
         var dest_is_attack = new Map([[this.hex.toString(), false]]);
+        var attack_targets = new Map();
         var pf = new aStar(valid_positions, true);
         hexLib.hex_spiral(this.hex, this.move_range+1).forEach(function(h)
         {
@@ -181,7 +184,10 @@ export class Unit extends Phaser.GameObjects.Image
             if (this.scene.occupied.has(h.toString()))
             {
                 if (this.scene.occupied.get(h.toString()).owner_id != this.owner_id)
+                {
                     is_attack = true;
+                    attack_targets.set(h.toString(), this.scene.occupied.get(h.toString()));
+                }
                 else
                     return;
             }
@@ -214,6 +220,8 @@ export class Unit extends Phaser.GameObjects.Image
                 inds.push(ind);
                 ind.setVisible(false);
                 var col = this.scene.player_colours[this.owner_id];
+                var attack_targ = attack_targets.get(h.toString());
+                var col2 = this.scene.player_colours[attack_targ.owner_id];
                 ind.setTint(col);
                 ind.depth = 2;
                 flat.on('pointerover', function(pointer, localx, localy, event)
@@ -236,10 +244,11 @@ export class Unit extends Phaser.GameObjects.Image
                     ind.setPosition(ind_original_pos.x, ind_original_pos.y);
                     this.scene.tweens.add({
                         targets: ind,
-                        ease: 'Cubic',
-                        duration: 300,
-                        x: "+="+2*x.toString(),
-                        y: "+="+2*y.toString(),
+                        ease: 'Stepped',
+                        easeParams: [3],
+                        duration: 375,
+                        x: "-="+6*x.toString(),
+                        y: "-="+6*y.toString(),
                         repeat: -1,
                         onComplete: function()
                         {
@@ -250,13 +259,13 @@ export class Unit extends Phaser.GameObjects.Image
                     tween = this.scene.tweens.addCounter({
                         from: 0,
                         to: 1,
-                        ease: 'Linear',
-                        duration: 300,
+                        ease: 'Stepped',
+                        easeParams: [3],
+                        duration: 375,
                         onUpdate: function()
                         {
-                            ind.setTint(lerpColour(col, red, tween.getValue()));
+                            ind.setTint(lerpColour(col2, col, tween.getValue()));
                         },
-                        yoyo: true,
                         repeat: -1
                     }, this);
                     ind.setTexture(img_id);
@@ -345,6 +354,10 @@ export class Unit extends Phaser.GameObjects.Image
         var img_id, flipx, flipy, x, y;
         [img_id, flipx, flipy, x, y] = get_attack_indication(diff);
         var mid_p = {x: p_penult.x/2 + p_ult.x/2, y: p_penult.y/2 + p_ult.y/2};
+
+
+        if (!enemy.can_move)
+            enemy.standUp(120*i);
 
         i++;
         this.scene.tweens.add({
@@ -491,7 +504,6 @@ export class Unit extends Phaser.GameObjects.Image
             i ++;
         }
         this.greyOut(120*i);
-
     }
 
     moveTo(h, path)
@@ -557,36 +569,41 @@ export class Unit extends Phaser.GameObjects.Image
         });
     }
 
+    standUp(delay=0)
+    {
+        var tween;
+        var speed = getRandomFloat(0.5, 1.5);
+        tween = this.scene.tweens.addCounter({
+            from: 0,
+            to: 1,
+            ease: 'Linear',
+            duration: 600*speed,
+            delay: delay,
+            onUpdate: function()
+            {
+                this.setTint(lerpColour(grey, black, tween.getValue()));
+            },
+            onUpdateScope: this
+        });
+        this.scene.tweens.add({
+            targets: this,
+            ease: "Linear",
+            duration: 600*speed,
+            delay: delay,
+            y: "-=2"
+        });        
+    }
+
     handleTurnEnd()
     {
         if (! this.can_move)
-        {
-            var tween;
-            var speed = getRandomFloat(0.5, 1.5);
-            tween = this.scene.tweens.addCounter({
-                from: 0,
-                to: 1,
-                ease: 'Linear',
-                duration: 600*speed,
-                onUpdate: function()
-                {
-                    this.setTint(lerpColour(grey, black, tween.getValue()));
-                },
-                onUpdateScope: this
-            });
-            this.scene.tweens.add({
-                targets: this,
-                ease: "Linear",
-                duration: 600*speed,
-                y: "-=2"
-            });
-        }
+            this.standUp();
         this.can_move = true;
     }
 
     die(bankrupcy)
     {
-        var initial_duration = bankrupcy ? getRandomInt(150, 450) : 0;
+        var initial_duration = bankrupcy ? getRandomInt(300, 900) : 0;
         range(1, 32).forEach(function(i)
         {
             if (exclude_death_pixel.get(this.type).has(i))
@@ -601,14 +618,13 @@ export class Unit extends Phaser.GameObjects.Image
             var y = starting_vec[1] + getRandomFloat(-1,1);
             var power = getRandomInt(1, 15);
             var duration = getRandomInt(300, 3000);
-            if (bankrupcy)
-                this.scene.tweens.add({
-                    targets: pixel,
-                    x: "-="+starting_vec[0].toString(),
-                    y: "-="+starting_vec[1].toString(),
-                    duration: initial_duration,
-                    ease: "Expo"
-                }, this);
+            this.scene.tweens.add({
+                targets: pixel,
+                x: "-="+starting_vec[0].toString(),
+                y: "-="+starting_vec[1].toString(),
+                duration: initial_duration,
+                ease: "Expo"
+            }, this);
             this.scene.tweens.add({
                 targets: pixel,
                 x: "+="+(x*power).toString(),
@@ -616,6 +632,8 @@ export class Unit extends Phaser.GameObjects.Image
                 duration: duration,
                 delay: initial_duration,
                 alpha: 0,
+                scaleX: 2,
+                scaleY: 2,
                 ease: "Cubic",
                 onComplete: function() {pixel.destroy()}
             }, this);
