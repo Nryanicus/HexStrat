@@ -10,6 +10,11 @@ const victory = "victory";
 const defeat = "defeat";
 const draw = "draw";
 
+const BogusAttackDirection = "bogus attack direction";
+const BogusUnitType = "bogus unit type";
+
+const one_normal = 0.7071067811865475;
+
 function combat_result(a, b)
 {
     if (a.type == recruit_musket)
@@ -45,11 +50,11 @@ function combat_result(a, b)
     }
     else
     {
+        console.log(BogusUnitType);
         console.log(a.type);
-        throw("bogus unit type");
+        throw(BogusUnitType);
     }
 }
-
 
 function get_attack_indication(h)
 {
@@ -57,16 +62,16 @@ function get_attack_indication(h)
     img_id = "attack_diag";
     flipx = false;
     flipy = false;
-    x = 1; 
-    y = 1;
     if (h.toString() == "Hex(0,-1,1)")
     {
-        // all values default
+        x = one_normal; 
+        y = one_normal;
     }
     else if (h.toString() == "Hex(1,-1,0)")
     {
         flipx = true;
-        x = -1; 
+        x = -one_normal; 
+        y = one_normal;
     }
     else if (h.toString() == "Hex(1,0,-1)")
     {
@@ -76,24 +81,27 @@ function get_attack_indication(h)
     }
     else if (h.toString() == "Hex(0,1,-1)")
     {
-        x = -1; 
-        y = -1;
+        x = -one_normal; 
+        y = -one_normal;
         flipx = true;
         flipy = true;
     }
     else if (h.toString() == "Hex(-1,1,0)")
     {
-        y = -1; 
+        x = one_normal; 
+        y = -one_normal; 
         flipy = true;
     }
     else if (h.toString() == "Hex(-1,0,1)")
     {
+        x = 1;
         y = 0;
         img_id = "attack";
         flipx = true;
     }
     else
     {
+        console.log(BogusAttackDirection);
         console.log(h);
         throw("bogus attack direction");
     }
@@ -180,6 +188,9 @@ export class Unit extends Phaser.GameObjects.Image
             var path = pf.findPath(this.hex, h);
             if (path.length > 0 && path.length <= this.move_range)
             {
+                // attacks can not be launched from occupied hexes
+                if (is_attack && this.scene.occupied.has(path[1].toString()))
+                    return;
                 possible_destinations.push(h);
                 possible_paths.set(h.toString(), path);
                 dest_is_attack.set(h.toString(), is_attack);
@@ -207,8 +218,19 @@ export class Unit extends Phaser.GameObjects.Image
                 ind.depth = 2;
                 flat.on('pointerover', function(pointer, localx, localy, event)
                 {
+                    var img_id, flipx, flipy, x, y;
                     var diff = hexLib.hex_subtract(h, previous_hex);
-                    [img_id, flipx, flipy, x, y] = get_attack_indication(diff);
+                    try
+                    {
+                        [img_id, flipx, flipy, x, y] = get_attack_indication(diff);
+                    }
+                    catch(BogusAttackDirection)
+                    {
+                        return;
+                    }
+                    var path = possible_paths.get(previous_hex.toString())
+                    if (path.length+1 > this.move_range)
+                        return;
 
                     this.scene.tweens.killTweensOf(ind);
                     ind.setPosition(ind_original_pos.x, ind_original_pos.y);
@@ -237,7 +259,6 @@ export class Unit extends Phaser.GameObjects.Image
                         yoyo: true,
                         repeat: -1
                     }, this);
-                    var img_id, flipx, flipy, x, y;
                     ind.setTexture(img_id);
                     ind.setFlipX(flipx);
                     ind.setFlipY(flipy);
@@ -260,6 +281,8 @@ export class Unit extends Phaser.GameObjects.Image
             }, this);
             flat.on('pointerdown', function(pointer, localx, localy, event)
             {
+                if (is_attack && possible_paths.get(previous_hex.toString()).length+1 > this.move_range)
+                    return;
                 p = this.scene.cameras.main.getWorldPoint(pointer.x, pointer.y);
                 h = hexLib.hex_round(hexLib.pixel_to_hex(hex_layout, p));
                 p = hexLib.hex_to_pixel(hex_layout, h);
@@ -269,7 +292,10 @@ export class Unit extends Phaser.GameObjects.Image
                 inds.map(f => f.destroy());
                 flats.map(f => f.destroy());
                 // lerp into position along path
-                this.moveTo(h, possible_paths.get(h.toString()), is_attack);
+                if (is_attack)
+                    this.attackTo(h, possible_paths.get(previous_hex.toString()));
+                else
+                    this.moveTo(h, possible_paths.get(h.toString()));
                 // todo have attack anim and UI
                 event.stopPropagation();
             }, this);
@@ -288,10 +314,189 @@ export class Unit extends Phaser.GameObjects.Image
         }, this);
     }
 
-    moveTo(h, path, is_attack)
+    attackTo(h_ult, path)
+    {
+        this.can_move = false;
+
+        path = path.reverse();
+
+        var i = 0;
+        path.forEach(function(ph)
+        {
+            var p = hexLib.hex_to_pixel(hex_layout, ph);
+            this.scene.tweens.add({
+                targets: this,
+                ease: "Cubic",
+                duration: 120,
+                delay: 120*i,
+                x: p.x,
+                y: p.y
+            });
+            i++;
+        }, this);
+
+        // hitstop
+        var h_penult = path[path.length-1];
+        var p_penult = hexLib.hex_to_pixel(hex_layout, h_penult);
+        var p_ult = hexLib.hex_to_pixel(hex_layout, h_ult);
+
+        var enemy = this.scene.occupied.get(h_ult.toString());
+        var diff = hexLib.hex_subtract(h_ult, h_penult);
+        var img_id, flipx, flipy, x, y;
+        [img_id, flipx, flipy, x, y] = get_attack_indication(diff);
+        var mid_p = {x: p_penult.x/2 + p_ult.x/2, y: p_penult.y/2 + p_ult.y/2};
+
+        i++;
+        this.scene.tweens.add({
+            targets: this,
+            ease: "Quadratic.easeOut",
+            duration: 240,
+            delay: 120*i,
+            x: "+="+(x*4).toString(),
+            y: "+="+(y*4).toString()
+        }, this);     
+        this.scene.tweens.add({
+            targets: enemy,
+            ease: "Quadratic.easeOut",
+            duration: 240,
+            delay: 120*i,
+            x: "-="+(x*4).toString(),
+            y: "-="+(y*4).toString()
+        }, this);
+        i += 2;
+        this.scene.tweens.add({
+            targets: this,
+            ease: "Quintic",
+            duration: 120,
+            delay: 120*i,
+            x: mid_p.x + x*4,
+            y: mid_p.y + y*4,
+        }, this);         
+        this.scene.tweens.add({
+            targets: enemy,
+            ease: "Quintic",
+            duration: 120,
+            delay: 120*i,
+            x: mid_p.x - x*4,
+            y: mid_p.y - y*4
+        }, this);
+        i++;
+        var result = combat_result(this, enemy);
+        if (result == victory)
+        {
+            this.scene.tweens.add({
+                targets: this,
+                ease: "Quintic",
+                duration: 120,
+                delay: 120*i,
+                x: p_ult.x,
+                y: p_ult.y,
+                onComplete: function()
+                {
+                    enemy.die(false);
+                    this.scene.occupied.set(h_ult.toString(), this);
+                    this.hex = h_ult;
+                    this.scene.events.emit(events.recalc_territories);
+                },
+                onCompleteScope: this
+            });
+            i++;
+        }
+        else if (result == defeat)
+        {
+            this.scene.tweens.add({
+                targets: enemy,
+                ease: "Quintic",
+                duration: 120,
+                delay: 120*i,
+                x: p_ult.x,
+                y: p_ult.y,
+                onComplete: function()
+                {
+                    var world = this.scene;
+                    this.die(false);
+                    world.events.emit(events.recalc_territories);
+                    enemy.greyOut(0);
+                    enemy.can_move = false;
+                },
+                onCompleteScope: this
+            });   
+            return;
+        }
+        else // draw
+        {
+            this.scene.tweens.add({
+                targets: this,
+                ease: "Quadratic.In",
+                duration: 120,
+                delay: 120*i,
+                x: mid_p.x,
+                y: mid_p.y,
+            }, this);         
+            this.scene.tweens.add({
+                targets: enemy,
+                ease: "Quadratic.In",
+                duration: 120,
+                delay: 120*i,
+                x: mid_p.x - x*12,
+                y: mid_p.y - y*12
+            }, this);
+            i++;
+            i++;
+
+            this.scene.tweens.add({
+                targets: this,
+                ease: "Quadratic.Out",
+                duration: 80,
+                delay: 120*i,
+                x: mid_p.x + x*12,
+                y: mid_p.y + y*12,
+            }, this);         
+            this.scene.tweens.add({
+                targets: enemy,
+                ease: "Quadratic.Out",
+                duration: 80,
+                delay: 120*i,
+                x: mid_p.x,
+                y: mid_p.y
+            }, this);
+            i++;
+
+            this.scene.tweens.add({
+                targets: this,
+                ease: "Quadratic",
+                duration: 120,
+                delay: 120*i,
+                x: p_penult.x,
+                y: p_penult.y,
+            });
+            this.scene.tweens.add({
+                targets: enemy,
+                ease: "Quadratic",
+                duration: 120,
+                delay: 120*i,
+                x: p_ult.x,
+                y: p_ult.y,
+                onComplete: function()
+                {
+                    this.hex = h_penult;
+                    this.scene.occupied.set(h_penult.toString(), this);
+                    this.hex = h_penult;
+                    this.scene.events.emit(events.recalc_territories);
+                    enemy.greyOut(0);
+                    enemy.can_move = false;
+                },
+                onCompleteScope: this
+            });
+            i ++;
+        }
+        this.greyOut(120*i);
+
+    }
+
+    moveTo(h, path)
     {
         this.can_move = h.toString() == this.hex.toString();
-        this.hex = h;
 
         // put us back in place
         if (this.can_move)
@@ -299,193 +504,30 @@ export class Unit extends Phaser.GameObjects.Image
             this.scene.occupied.set(h.toString(), this);
             return;
         }
-        if (path.length > 0)
+
+        path = path.reverse();
+
+        var i = 0;
+        path.forEach(function(ph)
         {
-            path = path.reverse();
-
-            var i = 0;
-            path.forEach(function(ph)
-            {
-                var p = hexLib.hex_to_pixel(hex_layout, ph);
-                if (is_attack && (i == path.length-1))
-                    return;
-                else
-                    this.scene.tweens.add({
-                        targets: this,
-                        ease: "Cubic",
-                        duration: 120,
-                        delay: 120*i,
-                        x: p.x,
-                        y: p.y
-                    });
-                i++;
-            }, this);
-        }
-
-        // hitstop
-        if (is_attack)
-        {
-            var h_penult = path[path.length-2];
-            var h_ult = path[path.length-1];
-            var p_penult = hexLib.hex_to_pixel(hex_layout, h_penult);
-            var p_ult = hexLib.hex_to_pixel(hex_layout, h_ult);
-
-            var enemy = this.scene.occupied.get(h_ult.toString());
-            var diff = hexLib.hex_subtract(h_ult, h_penult);
-            var img_id, flipx, flipy, x, y;
-            [img_id, flipx, flipy, x, y] = get_attack_indication(diff);
-            var mid_p = {x: p_penult.x/2 + p_ult.x/2, y: p_penult.y/2 + p_ult.y/2};
-
-            i++;
+            var p = hexLib.hex_to_pixel(hex_layout, ph);
             this.scene.tweens.add({
                 targets: this,
-                ease: "Quadratic.easeOut",
-                duration: 240,
-                delay: 120*i,
-                x: "+="+(x*4).toString(),
-                y: "+="+(y*4).toString()
-            }, this);     
-            this.scene.tweens.add({
-                targets: enemy,
-                ease: "Quadratic.easeOut",
-                duration: 240,
-                delay: 120*i,
-                x: "-="+(x*4).toString(),
-                y: "-="+(y*4).toString()
-            }, this);
-            i += 2;
-            this.scene.tweens.add({
-                targets: this,
-                ease: "Quintic",
+                ease: "Cubic",
                 duration: 120,
                 delay: 120*i,
-                x: mid_p.x + x*4,
-                y: mid_p.y + y*4,
-            }, this);         
-            this.scene.tweens.add({
-                targets: enemy,
-                ease: "Quintic",
-                duration: 120,
-                delay: 120*i,
-                x: mid_p.x - x*4,
-                y: mid_p.y - y*4
-            }, this);
+                x: p.x,
+                y: p.y
+            });
             i++;
-            var result = combat_result(this, enemy);
-            if (result == victory)
-            {
-                this.scene.tweens.add({
-                    targets: this,
-                    ease: "Quintic",
-                    duration: 120,
-                    delay: 120*i,
-                    x: p_ult.x,
-                    y: p_ult.y,
-                    onComplete: function()
-                    {
-                        enemy.die(false);
-                        this.scene.occupied.set(h.toString(), this);
-                        this.scene.events.emit(events.recalc_territories);
-                    },
-                    onCompleteScope: this
-                });
-                i++;
-            }
-            else if (result == defeat)
-            {
-                this.scene.tweens.add({
-                    targets: enemy,
-                    ease: "Quintic",
-                    duration: 120,
-                    delay: 120*i,
-                    x: p_ult.x,
-                    y: p_ult.y,
-                    onComplete: function()
-                    {
-                        var world = this.scene;
-                        this.die(false);
-                        world.events.emit(events.recalc_territories);
-                        enemy.greyOut(0);
-                        enemy.can_move = false;
-                    },
-                    onCompleteScope: this
-                });   
-                return;
-            }
-            else // draw
-            {
-                this.scene.tweens.add({
-                    targets: this,
-                    ease: "Linear",
-                    duration: 120,
-                    delay: 120*i,
-                    x: mid_p.x + x*8,
-                    y: mid_p.y + y*8,
-                }, this);         
-                this.scene.tweens.add({
-                    targets: enemy,
-                    ease: "Linear",
-                    duration: 120,
-                    delay: 120*i,
-                    x: mid_p.x,
-                    y: mid_p.y
-                }, this);
-                i++;
+        }, this);
 
-                this.scene.tweens.add({
-                    targets: this,
-                    ease: "Linear",
-                    duration: 120,
-                    delay: 120*i,
-                    x: mid_p.x,
-                    y: mid_p.y,
-                }, this);         
-                this.scene.tweens.add({
-                    targets: enemy,
-                    ease: "Linear",
-                    duration: 120,
-                    delay: 120*i,
-                    x: mid_p.x - x*8,
-                    y: mid_p.y - y*8
-                }, this);
-                i++;
-
-                this.scene.tweens.add({
-                    targets: this,
-                    ease: "Quadratic",
-                    duration: 120,
-                    delay: 120*i,
-                    x: p_penult.x,
-                    y: p_penult.y,
-                });
-                this.scene.tweens.add({
-                    targets: enemy,
-                    ease: "Quadratic",
-                    duration: 120,
-                    delay: 120*i,
-                    x: p_ult.x,
-                    y: p_ult.y,
-                    onComplete: function()
-                    {
-                        this.hex = h_penult;
-                        this.scene.occupied.set(h_penult.toString(), this);
-                        this.scene.events.emit(events.recalc_territories);
-                        enemy.greyOut(0);
-                        enemy.can_move = false;
-                    },
-                    onCompleteScope: this
-                });
-                i ++;
-            }
-        }
-        else
+        this.scene.time.delayedCall(120*i, function()
         {
-            this.scene.time.delayedCall(120*i, function()
-            {
-                this.scene.occupied.set(h.toString(), this);
-                this.scene.events.emit(events.recalc_territories);
-            }, [], this);
-        }
+            this.scene.occupied.set(h.toString(), this);
+            this.hex = h;
+            this.scene.events.emit(events.recalc_territories);
+        }, [], this);
 
         this.greyOut(120*i);
     }

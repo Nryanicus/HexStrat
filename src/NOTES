@@ -2,9 +2,6 @@ BUGS:
 =============
 Bankrupcy mass die off can happen in an order which will leave upkeep UI in an incorrect state
     - refactor UIScene to listen for registry events instead
-Units unselectable after being told to remain in place
-After draw the initiating unit's hex stays occupied after movement
-Movement animation going through water in bottlenecks / pathing through enemies
 
 TODO:
 =============
@@ -12,6 +9,9 @@ cancel recruitment somehow. Click on capitol?
 
 replace image.toHit in capitol recruitment menu with similar hit areas used in UIScene
 
+Have attacks be launched from the moused-over hex instead of following the default shortest-path
+
+redo attack indicator sprites
 
 NOTES:
 =============

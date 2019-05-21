@@ -64,7 +64,7 @@ export class aStar
                 // console.log("examining neighbour "+h);
                 if (this.allow_goal_outside_set)
                 {
-                    if (!this.hex_set.has(current.toString()) && !this.hex_set.has(h.toString()))
+                    if (!this.hex_set.has(h.toString()) && !(h.toString() == goal.toString()))
                         return;
                 }
                 else
