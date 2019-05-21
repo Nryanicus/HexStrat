@@ -13,6 +13,7 @@ export const recruit_sword = "sword";
 export const recruit_cavalry = "cavalry";
 export const recruit_pike = "pike";
 export const recruit_musket = "musket";
+export const cancel_recruitment = "cancel_recruitment";
  
 export const end_turn = "end_turn";
 

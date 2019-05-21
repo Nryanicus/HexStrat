@@ -301,6 +301,27 @@ export class UIScene extends Phaser.Scene
             this.registry.set("upkeep"+this.player_id.toString(), up);
             this.lerpNumericText(this.upkeep, curr_up, up);
         }, this);
+
+        // refund cancelled unit recruitment
+        this.world.events.on(events.cancel_recruitment, function(player_id, unit_type)
+        {
+            if (player_id != this.player_id)
+                return;
+
+            var up = this.registry.get("upkeep"+this.player_id.toString());
+            var curr_up = up;
+            up -= unit_cost.get(unit_type);
+            this.registry.set("upkeep"+this.player_id.toString(), up);
+            this.lerpNumericText(this.upkeep, curr_up, up);
+
+            var t = this.registry.get("treasury"+player_id.toString());
+            var curr_t = t;
+            var cost = unit_cost.get(unit_type);
+            t += cost;
+            this.registry.set("treasury"+player_id.toString(), t);
+            this.lerpNumericText(this.treasury, curr_t, t);
+        }, this);
+
     }
 
     setWorld(world)

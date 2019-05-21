@@ -642,7 +642,7 @@ export class Unit extends Phaser.GameObjects.Image
             tween = this.scene.tweens.addCounter({
                 from: 0,
                 to: 1,
-                ease: 'Expo',
+                ease: 'Quadratic.Out',
                 duration: duration,
                 delay: initial_duration,
                 onUpdate: function()

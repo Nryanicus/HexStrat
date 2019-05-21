@@ -103,12 +103,12 @@ export class Capitol extends Phaser.GameObjects.Image
             this.scene.events.emit(events.show_hex_cursor);
         }, this);
 
+        var flats = [];
         this.scene.events.on(events.recruit, function(type, player_id)
         {
             if (player_id != this.owner_id)
                 return;
             // don't check conditions, that happens in recruit_attempt
-            var flats = [];
             this.closeMenu();
 
             var p = this.scene.cameras.main.getWorldPoint(event.x, event.y);
@@ -157,6 +157,17 @@ export class Capitol extends Phaser.GameObjects.Image
                 });
             }, this);
         }, this);
+
+        this.scene.events.on(events.cancel_recruitment, function(player_id, unit_type)
+        {
+            if (player_id != this.owner_id)
+                return;
+            this.scene.registry.get(events.unit_to_place).destroy();
+            this.scene.registry.set(events.is_placing_unit, false);
+            this.scene.registry.set(events.unit_to_place, null);
+            flats.map(f => f.destroy());
+            flats = [];
+        }, this);
     }
 
     closeMenu()
@@ -179,7 +190,16 @@ export class Capitol extends Phaser.GameObjects.Image
     handlePointerDown()
     {
         if (this.scene.registry.get(events.is_placing_unit))
-            return;
-        this.openMenu();
+        {
+            if (this.scene.registry.get(events.unit_to_place).owner_id == this.owner_id)
+            {
+                var utp = this.scene.registry.get(events.unit_to_place);
+                this.scene.events.emit(events.cancel_recruitment, this.owner_id, utp.type);
+            }
+            else
+                return;
+        }
+        else
+            this.openMenu();
     }
 }
