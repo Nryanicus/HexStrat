@@ -1,5 +1,5 @@
 import {aStar} from "./misc/aStar.mjs";
-import {hex_layout, grey, black, red, white, exclude_death_pixel, death_pixel_dirc, capitol} from "./misc/constants.mjs";
+import {hex_layout, grey, black, red, white, exclude_death_pixel, death_pixel_dirc, capitol, one_normal} from "./misc/constants.mjs";
 import {recruit_sword, recruit_cavalry, recruit_pike, recruit_musket} from "./misc/events.mjs";
 import {lerpColour, getRandomFloat, range, getRandomInt} from "./misc/utilities.mjs";
 import * as hexLib from "./misc/hex-functions.mjs";
@@ -13,8 +13,6 @@ const attack_capitol = "attack_cap";
 
 const BogusAttackDirection = "bogus attack direction";
 const BogusUnitType = "bogus unit type";
-
-const one_normal = 0.7071067811865475;
 
 function combat_result(a, b)
 {
@@ -347,18 +345,21 @@ export class Unit extends Phaser.GameObjects.Image
             i++;
         }, this);
 
+
         // hitstop
         var h_penult = path[path.length-1];
         var p_penult = hexLib.hex_to_pixel(hex_layout, h_penult);
         var p_ult = hexLib.hex_to_pixel(hex_layout, h_ult);
 
-        var enemy = this.scene.occupied.get(h_ult.toString());
         var diff = hexLib.hex_subtract(h_ult, h_penult);
         var img_id, flipx, flipy, x, y;
         [img_id, flipx, flipy, x, y] = get_attack_indication(diff);
         var mid_p = {x: p_penult.x/2 + p_ult.x/2, y: p_penult.y/2 + p_ult.y/2};
 
-        if (!enemy.type == capitol && enemy.can_move)
+        var enemy = this.scene.occupied.get(h_ult.toString());
+        var result = combat_result(this, enemy);
+
+        if (!enemy.can_move && result != attack_capitol)
             enemy.standUp(120*i);
 
         i++;
@@ -370,14 +371,15 @@ export class Unit extends Phaser.GameObjects.Image
             x: "+="+(x*4).toString(),
             y: "+="+(y*4).toString()
         }, this);     
-        this.scene.tweens.add({
-            targets: enemy,
-            ease: "Quadratic.easeOut",
-            duration: 240,
-            delay: 120*i,
-            x: "-="+(x*4).toString(),
-            y: "-="+(y*4).toString()
-        }, this);
+        if (result != attack_capitol)
+            this.scene.tweens.add({
+                targets: enemy,
+                ease: "Quadratic.easeOut",
+                duration: 240,
+                delay: 120*i,
+                x: "-="+(x*4).toString(),
+                y: "-="+(y*4).toString()
+            }, this);
         i += 2;
         this.scene.tweens.add({
             targets: this,
@@ -387,20 +389,16 @@ export class Unit extends Phaser.GameObjects.Image
             x: mid_p.x + x*4,
             y: mid_p.y + y*4,
         }, this);         
-        this.scene.tweens.add({
-            targets: enemy,
-            ease: "Quintic",
-            duration: 120,
-            delay: 120*i,
-            x: mid_p.x - x*4,
-            y: mid_p.y - y*4
-        }, this);
+        if (result != attack_capitol)
+            this.scene.tweens.add({
+                targets: enemy,
+                ease: "Quintic",
+                duration: 120,
+                delay: 120*i,
+                x: mid_p.x - x*4,
+                y: mid_p.y - y*4
+            }, this);
         i++;
-        var result = combat_result(this, enemy);
-        if (result == attack_capitol)
-        {
-
-        }
         if (result == victory)
         {
             this.scene.tweens.add({
@@ -442,7 +440,7 @@ export class Unit extends Phaser.GameObjects.Image
             });   
             return;
         }
-        else // draw
+        else if (result == draw)
         {
             this.scene.tweens.add({
                 targets: this,
@@ -508,6 +506,45 @@ export class Unit extends Phaser.GameObjects.Image
                 onCompleteScope: this
             });
             i ++;
+        }
+        else // attack cap
+        {
+            var cap_dead = enemy.lives == 1;
+            var h;
+            if (cap_dead)
+                h = h_ult
+            else
+                h = h_penult
+            this.scene.tweens.add({
+                targets: this,
+                ease: "Quintic",
+                duration: 120,
+                delay: 120*i,
+                x: p_ult.x,
+                y: p_ult.y,
+                onComplete: function()
+                {
+                    enemy.loseLife();
+                    this.scene.occupied.set(h.toString(), this);
+                    this.hex = h;
+                    this.scene.events.emit(events.recalc_territories);
+                },
+                onCompleteScope: this
+            });
+            if (!cap_dead)
+            {
+                i++;
+                this.scene.tweens.add({
+                    targets: this,
+                    ease: "Quadratic",
+                    duration: 120,
+                    delay: 120*i,
+                    x: p_penult.x,
+                    y: p_penult.y,
+                });
+            }
+
+            i++;
         }
         this.greyOut(120*i);
     }
@@ -641,7 +678,7 @@ export class Unit extends Phaser.GameObjects.Image
                 scaleX: 2,
                 scaleY: 2,
                 ease: "Cubic",
-                onComplete: function() {pixel.destroy()}
+                onComplete: function() {pixel.destroy();}
             }, this);
             var tween;
             var col = this.scene.player_colours[this.owner_id];

@@ -15,12 +15,20 @@ export class MasterScene extends Phaser.Scene
     {
         this.num_players = 2;
 
-        this.scene.add('world', WorldScene, true, {master: this});
-        this.scene.add('ui', UIScene, true, {master: this});
-        this.world = this.scene.get('world');
-        this.ui = this.scene.get('ui');
-        this.ui.setWorld(this.world);
+        this.initNewWorld();
+    }
 
+    initNewWorld()
+    {
+        this.registry.set(events.can_gen, false)
+        this.scene.remove('world');
+        this.scene.remove('ui');
+        this.scene.add('world', WorldScene, true, {master: this});
+        this.scene.moveBelow('world', "ui");
+        this.scene.add('ui', UIScene, true, {master: this});
+        this.ui = this.scene.get('ui');
+        this.world = this.scene.get('world');
+        this.ui.setWorld(this.world);
         this.initEventHandlers();
     }
 
@@ -41,15 +49,7 @@ export class MasterScene extends Phaser.Scene
         this.input.keyboard.on('keydown-Z', function (event) 
         {
             if (this.registry.get(events.can_gen))
-            {
-                this.ui.events.emit(events.hide_ui);
-                this.registry.set(events.can_gen, false)
-                this.scene.remove('world');
-                this.scene.add('world', WorldScene, true, {master: this});
-                this.scene.moveBelow('world', "ui");
-                this.world = this.scene.get('world');
-                this.ui.setWorld(world);
-            }
+                this.initNewWorld();
         }, this);
 
         // game logic events

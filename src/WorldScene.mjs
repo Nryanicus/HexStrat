@@ -87,6 +87,37 @@ export class WorldScene extends Phaser.Scene
         this.load.image('dead29', 'res/UnitDeathPixel29.png');
         this.load.image('dead30', 'res/UnitDeathPixel30.png');
         this.load.image('dead31', 'res/UnitDeathPixel31.png');
+
+        this.load.image('cap01', 'res/CapDeathPixel01.png');
+        this.load.image('cap02', 'res/CapDeathPixel02.png');
+        this.load.image('cap03', 'res/CapDeathPixel03.png');
+        this.load.image('cap04', 'res/CapDeathPixel04.png');
+        this.load.image('cap05', 'res/CapDeathPixel05.png');
+        this.load.image('cap06', 'res/CapDeathPixel06.png');
+        this.load.image('cap07', 'res/CapDeathPixel07.png');
+        this.load.image('cap08', 'res/CapDeathPixel08.png');
+        this.load.image('cap09', 'res/CapDeathPixel09.png');
+        this.load.image('cap10', 'res/CapDeathPixel10.png');
+        this.load.image('cap11', 'res/CapDeathPixel11.png');
+        this.load.image('cap12', 'res/CapDeathPixel12.png');
+        this.load.image('cap13', 'res/CapDeathPixel13.png');
+        this.load.image('cap14', 'res/CapDeathPixel14.png');
+        this.load.image('cap15', 'res/CapDeathPixel15.png');
+        this.load.image('cap16', 'res/CapDeathPixel16.png');
+        this.load.image('cap17', 'res/CapDeathPixel17.png');
+        this.load.image('cap18', 'res/CapDeathPixel18.png');
+        this.load.image('cap19', 'res/CapDeathPixel19.png');
+        this.load.image('cap20', 'res/CapDeathPixel20.png');
+        this.load.image('cap21', 'res/CapDeathPixel21.png');
+        this.load.image('cap22', 'res/CapDeathPixel22.png');
+        this.load.image('cap23', 'res/CapDeathPixel23.png');
+        this.load.image('cap24', 'res/CapDeathPixel24.png');
+        this.load.image('cap25', 'res/CapDeathPixel25.png');
+        this.load.image('cap26', 'res/CapDeathPixel26.png');
+        this.load.image('cap27', 'res/CapDeathPixel27.png');
+        this.load.image('cap28', 'res/CapDeathPixel28.png');
+        this.load.image('cap29', 'res/CapDeathPixel29.png');
+        this.load.image('cap30', 'res/CapDeathPixel30.png');
     }
 
     create()
