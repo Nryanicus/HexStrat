@@ -5,7 +5,6 @@ import {lerpColour, getRandomFloat, range, getRandomInt} from "./misc/utilities.
 import * as hexLib from "./misc/hex-functions.mjs";
 import * as events from "./misc/events.mjs";
 
-
 const victory = "victory";
 const defeat = "defeat";
 const draw = "draw";
