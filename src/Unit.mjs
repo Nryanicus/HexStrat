@@ -1,62 +1,13 @@
 import {aStar} from "./misc/aStar.mjs";
-import {hex_layout, grey, black, red, white, exclude_death_pixel, death_pixel_dirc, capitol, one_normal} from "./misc/constants.mjs";
+import {hex_layout, grey, black, red, white, exclude_death_pixel, death_pixel_dirc, capitol, one_normal, unit_movement, victory, defeat, draw, attack_capitol} from "./misc/constants.mjs";
 import {recruit_sword, recruit_cavalry, recruit_pike, recruit_musket} from "./misc/events.mjs";
-import {lerpColour, getRandomFloat, range, getRandomInt} from "./misc/utilities.mjs";
+import {lerpColour, getRandomFloat, range, getRandomInt, combatResult} from "./misc/utilities.mjs";
 import * as hexLib from "./misc/hex-functions.mjs";
 import * as events from "./misc/events.mjs";
 
-const victory = "victory";
-const defeat = "defeat";
-const draw = "draw";
-const attack_capitol = "attack_cap";
-
+// exceptions
 const BogusAttackDirection = "bogus attack direction";
 const BogusUnitType = "bogus unit type";
-
-function combat_result(a, b)
-{
-    if (b.type == capitol)
-        return attack_capitol;
-    if (a.type == recruit_musket && b.type == recruit_musket)
-        return draw;
-    if (a.type == recruit_musket)
-        return victory;
-    if (b.type == recruit_musket)
-        return victory;
-    if (a.type == recruit_sword)
-    {
-        if (b.type == recruit_sword)
-            return draw;
-        if (b.type == recruit_pike)
-            return victory;
-        if (b.type == recruit_cavalry)
-            return defeat;
-    }
-    else if (a.type == recruit_pike)
-    {
-        if (b.type == recruit_pike)
-            return draw;
-        if (b.type == recruit_cavalry)
-            return victory;
-        if (b.type == recruit_sword)
-            return defeat;
-    }
-    else if (a.type == recruit_cavalry)
-    {
-        if (b.type == recruit_cavalry)
-            return draw;
-        if (b.type == recruit_sword)
-            return victory;
-        if (b.type == recruit_pike)
-            return defeat;
-    }
-    else
-    {
-        console.log(BogusUnitType);
-        console.log(a.type);
-        throw(BogusUnitType);
-    }
-}
 
 function get_attack_indication(h)
 {
@@ -126,9 +77,9 @@ export class Unit extends Phaser.GameObjects.Image
         this.owner_id = owner_id;
         this.type = type;
         this.hex = hex;
-        this.can_move = type != "capitol";
+        this.can_move = false;
 
-        this.move_range = type == "cavalry" ? 6 : 4;
+        this.move_range = unit_movement.get(type);
 
         this.scene.events.on(events.end_turn, this.handleTurnEnd, this);
         this.scene.events.on(events.player_bankrupt, this.bankrupcyCheck, this);
@@ -161,7 +112,6 @@ export class Unit extends Phaser.GameObjects.Image
 
         // determine where the unit can be placed
         var valid_positions = new Set();
-        var valid_destinations = new Set();
         hexLib.hex_spiral(this.hex, this.move_range+1).forEach(function(h)
         {
             if (!this.scene.world_string_set.has(h.toString()))

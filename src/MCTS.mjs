@@ -34,7 +34,7 @@ class MonteCarloTreeSearchNode
         return this.reward/this.backpropagation_visits + Math.sqrt( Math.log(this.parent.backpropagation_visits) / this.backpropagation_visits);
     }
 
-    getbestUpperConfidenceBoundChild()
+    getBestUpperConfidenceBoundChild()
     {
         var best_child = this.children[0];
         var best_uct = best_child.getUpperConfidenceBound();
@@ -51,7 +51,7 @@ class MonteCarloTreeSearchNode
     traverse()
     {
         if (this.fullyExpanded())
-            return this.getbestUpperConfidenceBoundChild().traverse();
+            return this.getBestUpperConfidenceBoundChild().traverse();
         if (this.state.gameOver)
             return this.pickUnexpandedChild();
     }

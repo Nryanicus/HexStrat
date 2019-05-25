@@ -1,3 +1,5 @@
+import {sword, pike, cavalry, musket} from "./constants.mjs"
+
 // events
 export const hexdown = "hexdown";
 export const hexover = "hexover";
@@ -9,10 +11,10 @@ export const hide_ui = "hide_ui";
 
 export const recruit_attempt = "recruit_attempt"; // one of the below (aka unit type), player id
 export const recruit = "recruit"; // one of the below (aka unit type), player id
-export const recruit_sword = "sword";
-export const recruit_cavalry = "cavalry";
-export const recruit_pike = "pike";
-export const recruit_musket = "musket";
+export const recruit_sword = sword;
+export const recruit_cavalry = cavalry;
+export const recruit_pike = pike;
+export const recruit_musket = musket;
 export const cancel_recruitment = "cancel_recruitment"; // player_id, unit_type
  
 export const end_turn = "end_turn";
