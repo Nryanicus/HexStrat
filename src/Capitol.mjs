@@ -1,5 +1,5 @@
 import * as hexLib from "./misc/hex-functions.mjs";
-import {hex_layout, black, unit_cost, capitol_pixel_columns, capitol_death_pixels} from "./misc/constants.mjs";
+import {hex_layout, black, grey, unit_cost, capitol_pixel_columns, capitol_death_pixels, capitol} from "./misc/constants.mjs";
 import {range, getRandomInt, getRandomFloat, lerpColour} from "./misc/utilities.mjs";
 import * as events from "./misc/events.mjs";
 import {Unit} from "./Unit.mjs";
@@ -15,10 +15,12 @@ export class Capitol extends Phaser.GameObjects.Container
         this.owner_id = owner_id;
         this.setPosition(x, y);
         this.depth = 1;
-        this.type = "duck";
+        this.type = capitol;
         this.lives = 3;
         this.pixels = new Map();
         this.flats = [];
+
+        this.can_move = false; // duck typing for things that scan occupied hexes
 
         // deep copy
         this.pixels_columns = [];
@@ -155,6 +157,7 @@ export class Capitol extends Phaser.GameObjects.Container
         this.scene.registry.set(events.is_placing_unit, true);
         var utp = this.scene.add.existing(new Unit(this.scene, p.x, p.y-2, type, h, this.owner_id, this.scene.occupied, this.scene.world_string_set));
         this.scene.registry.set(events.unit_to_place, utp);
+        this.scene.events.emit(events.recruit_cost, utp.type, player_id)
 
         hexLib.hex_ring(this.hex, 1).forEach(function(h)
         {
@@ -180,8 +183,19 @@ export class Capitol extends Phaser.GameObjects.Container
                     targets: utp,
                     ease: 'Back',
                     easeParams: [4.5],
-                    y: "+=2",
-                    duration: 60
+                    y: "+=4",
+                    duration: 120,
+                });
+                var tween;
+                tween = this.scene.tweens.addCounter({
+                    from: 0,
+                    to: 1,
+                    ease: 'Linear',
+                    duration: 120,
+                    onUpdate: function()
+                    {
+                        utp.setTint(lerpColour(black, grey, tween.getValue()));
+                    }
                 });
                 event.stopPropagation();
             }, this);

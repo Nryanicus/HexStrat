@@ -1,13 +1,55 @@
 import {aStar} from "./misc/aStar.mjs";
-import {hex_layout, grey, black, red, white, exclude_death_pixel, death_pixel_dirc, capitol, one_normal, unit_movement, victory, defeat, draw, attack_capitol} from "./misc/constants.mjs";
-import {recruit_sword, recruit_cavalry, recruit_pike, recruit_musket} from "./misc/events.mjs";
-import {lerpColour, getRandomFloat, range, getRandomInt, combatResult} from "./misc/utilities.mjs";
+import {sword, pike, cavalry, musket, capitol, hex_layout, grey, black, red, white, exclude_death_pixel, death_pixel_dirc, one_normal, unit_movement, victory, defeat, draw, attack_capitol} from "./misc/constants.mjs";
+import {lerpColour, getRandomFloat, range, getRandomInt} from "./misc/utilities.mjs";
 import * as hexLib from "./misc/hex-functions.mjs";
 import * as events from "./misc/events.mjs";
 
 // exceptions
 const BogusAttackDirection = "bogus attack direction";
 const BogusUnitType = "bogus unit type";
+
+export function combatResult(a, b)
+{
+    if (b.type == capitol)
+        return attack_capitol;
+    if (a.type == musket && b.type == musket)
+        return draw;
+    if (a.type == musket)
+        return victory;
+    if (b.type == musket)
+        return victory;
+    if (a.type == sword)
+    {
+        if (b.type == sword)
+            return draw;
+        if (b.type == pike)
+            return victory;
+        if (b.type == cavalry)
+            return defeat;
+    }
+    else if (a.type == pike)
+    {
+        if (b.type == pike)
+            return draw;
+        if (b.type == cavalry)
+            return victory;
+        if (b.type == sword)
+            return defeat;
+    }
+    else if (a.type == cavalry)
+    {
+        if (b.type == cavalry)
+            return draw;
+        if (b.type == sword)
+            return victory;
+        if (b.type == pike)
+            return defeat;
+    }
+    console.log(BogusUnitType);
+    console.log(a.type);
+    console.log(b.type);
+    throw(BogusUnitType);
+}
 
 function get_attack_indication(h)
 {
@@ -81,7 +123,7 @@ export class Unit extends Phaser.GameObjects.Image
 
         this.move_range = unit_movement.get(type);
 
-        this.scene.events.on(events.end_turn, this.handleTurnEnd, this);
+        this.scene.events.on(events.end_round, this.handleRoundEnd, this);
         this.scene.events.on(events.player_bankrupt, this.bankrupcyCheck, this);
     }
 
@@ -306,7 +348,7 @@ export class Unit extends Phaser.GameObjects.Image
         var mid_p = {x: p_penult.x/2 + p_ult.x/2, y: p_penult.y/2 + p_ult.y/2};
 
         var enemy = this.scene.occupied.get(h_ult.toString());
-        var result = combat_result(this, enemy);
+        var result = combatResult(this.type, enemy.type);
 
         if (!enemy.can_move && result != attack_capitol)
             enemy.standUp(120*i);
@@ -586,7 +628,7 @@ export class Unit extends Phaser.GameObjects.Image
         });        
     }
 
-    handleTurnEnd()
+    handleRoundEnd()
     {
         if (! this.can_move)
             this.standUp();
@@ -647,7 +689,7 @@ export class Unit extends Phaser.GameObjects.Image
         this.scene.occupied.delete(this.hex.toString());
         this.scene.events.emit(events.unit_death, this)
         this.scene.events.off(events.player_bankrupt, this.bankrupcyCheck, this);
-        this.scene.events.off(events.end_turn, this.handleTurnEnd, this);
+        this.scene.events.off(events.end_round, this.handleRoundEnd, this);
         this.destroy();
     }
 }

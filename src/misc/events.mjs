@@ -16,8 +16,10 @@ export const recruit_cavalry = cavalry;
 export const recruit_pike = pike;
 export const recruit_musket = musket;
 export const cancel_recruitment = "cancel_recruitment"; // player_id, unit_type
+export const recruit_cost = "recruit_cost"; // unit_type, player_id
  
 export const end_turn = "end_turn";
+export const end_round = "end_round";
 
 export const territory_change = "territory_change";
 export const recalc_territories = "recalc_territories";
@@ -26,6 +28,7 @@ export const shake_treasury = "shake_treasury"; // player_id
 export const unit_death = "unit_death"; // unit
 
 // registry keys
+export const current_player = "current_player";
 export const is_placing_unit = "is_placing_unit";
 export const unit_to_place = "unit_to_place";
 export const can_gen = "can_gen";

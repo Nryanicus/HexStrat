@@ -1,19 +1,31 @@
-import {heuristic} from "./GameLogic.mjs";
+import * as GameLogic from "./GameLogic.mjs";
 import {shuffle} from "./misc/utilities.mjs";
 
+// return all actions until we end our turn
 export function MCTS(root, time)
 {
-    while (time > 0)
+    var start_time = Date.now();
+    while ((Date.now() - start_time) < 1000*time)
     {
         var leaf = root.traverse();
         var result = leaf.simulate();
         leaf.backpropagate(result);
-        // TODO: decrement time
     }
-    return root.bestChild();
+    var node = root.bestChild();
+    var actions = [node.state.action];
+    while (node.state.action.type != GameLogic.end_turn && node.children.length != 0)
+    {
+        node = node.bestChild();
+        actions.push(node.state.action);
+    }
+    if (actions[actions.length-1].type != GameLogic.end_turn)
+    {
+        actions.push({type: GameLogic.end_turn});
+    }
+    return actions;
 }
 
-class MonteCarloTreeSearchNode
+export class MonteCarloTreeSearchNode
 {
     constructor(parent, state, player_id)
     {
@@ -53,13 +65,14 @@ class MonteCarloTreeSearchNode
         if (this.fullyExpanded())
             return this.getBestUpperConfidenceBoundChild().traverse();
         if (this.state.gameOver)
-            return this.pickUnexpandedChild();
+            return this;
+        return this.pickUnexpandedChild();
     }
 
     // create a new child
     pickUnexpandedChild()
     {
-        var chosen = heuristic(this.unexpandedChildren, this.player_id);
+        var chosen = GameLogic.heuristic(this.unexpandedChildren, this.player_id);
         var i = this.unexpandedChildren.indexOf(chosen);
         this.unexpandedChildren.splice(i, 1);
 
@@ -84,8 +97,10 @@ class MonteCarloTreeSearchNode
     {
         this.reward += value;
         this.backpropagation_visits++;
-        if (parent != null)
-            parent.backpropagate(value);
+        if (this.parent != null)
+        {
+            this.parent.backpropagate(value);
+        }
     }
 
     // return most visited child

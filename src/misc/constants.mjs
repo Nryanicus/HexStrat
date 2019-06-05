@@ -31,10 +31,10 @@ export const musket = "musket";
 export const capitol = "capitol";
 
 // combat results
-const victory = "victory";
-const defeat = "defeat";
-const draw = "draw";
-const attack_capitol = "attack_cap";
+export const victory = "victory";
+export const defeat = "defeat";
+export const draw = "draw";
+export const attack_capitol = "attack_cap";
 
 // maps and arrays
 export const colour_names = new Map([[background, "background"], [white, "white"], [purple, "purple"], [grey, "grey"], [brown, "brown"], [cream, "cream"], [light_blue, "light_blue"], [yellow, "yellow"], [pink, "pink"], [orange, "orange"], [deep_pink, "deep_pink"], [green, "green"]]);

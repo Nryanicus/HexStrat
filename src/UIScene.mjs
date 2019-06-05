@@ -283,7 +283,6 @@ export class UIScene extends Phaser.Scene
             });
 
         }, this); 
-
         this.world.events.emit(events.territory_change);
         this.initEventHandlers();
     }

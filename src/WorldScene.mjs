@@ -140,19 +140,8 @@ export class WorldScene extends Phaser.Scene
             this.events.emit(events.territory_change);
         }, this);
 
-        this.registry.set("treasury0", 21);
-        this.registry.set("upkeep0", 0);
-
         this.createMap();
         this.initUI();
-
-        var i = 0;
-        this.territories.forEach(function(owner_id, string, map)
-        {
-            if (owner_id == 0)
-                i++;
-        }, this);
-        this.registry.set("income0", i);
 
         this.input.keyboard.on('keydown-T', function (event)
         {
@@ -273,6 +262,7 @@ export class WorldScene extends Phaser.Scene
             this.camera_controls.start();
             this.registry.set(events.can_gen, true);
             this.events.emit(events.show_hex_cursor);
+            this.events.emit(events.territory_change, true);
             this.events.emit(events.show_ui, true);
         }, [], this);
     }

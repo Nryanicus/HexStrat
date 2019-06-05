@@ -1,5 +1,3 @@
-'use strict';
-
 export function range(start, stop, step) {
     if (typeof stop == 'undefined') {
         // one param defined
@@ -72,49 +70,4 @@ export function padString(str)
         str = " "+str;
     }
     return str;
-}
-
-export function combatResult(a, b)
-{
-    if (b.type == capitol)
-        return attack_capitol;
-    if (a.type == recruit_musket && b.type == recruit_musket)
-        return draw;
-    if (a.type == recruit_musket)
-        return victory;
-    if (b.type == recruit_musket)
-        return victory;
-    if (a.type == recruit_sword)
-    {
-        if (b.type == recruit_sword)
-            return draw;
-        if (b.type == recruit_pike)
-            return victory;
-        if (b.type == recruit_cavalry)
-            return defeat;
-    }
-    else if (a.type == recruit_pike)
-    {
-        if (b.type == recruit_pike)
-            return draw;
-        if (b.type == recruit_cavalry)
-            return victory;
-        if (b.type == recruit_sword)
-            return defeat;
-    }
-    else if (a.type == recruit_cavalry)
-    {
-        if (b.type == recruit_cavalry)
-            return draw;
-        if (b.type == recruit_sword)
-            return victory;
-        if (b.type == recruit_pike)
-            return defeat;
-    }
-    else
-    {
-        console.log(BogusUnitType);
-        console.log(a.type);
-        throw(BogusUnitType);
-    }
 }
