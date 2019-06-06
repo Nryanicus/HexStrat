@@ -210,7 +210,7 @@ export class MasterScene extends Phaser.Scene
             var unit = this.world.occupied.get(action.from.toString());
             this.world.occupied.delete(action.from.toString());
             var dest = action.to;
-            var path = new aStar(this.getValidMovementHexes(unit), true).findPath(unit.hex, dest);
+            var path = new aStar(this.getValidMovementHexes(unit), (action.type == GameLogic.attack_to || action.type == GameLogic.attack_bounce_to)).findPath(unit.hex, dest);
             console.log(unit);
             console.log(dest);
             console.log(path);

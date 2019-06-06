@@ -8,6 +8,10 @@ if turn ended too soon after movement, greyOut continues and overrides standUp
 
 unit cancelled before recruited not cleaned up properly, tweens get called
 
+AI actions need to have their animations queued better
+
+AI movement paths going OOB
+
 TODO:
 =============
 Juice: have enemy unit move back a single pixel when you mouse over next to them
@@ -15,6 +19,10 @@ Juice: have enemy unit move back a single pixel when you mouse over next to them
 Have non-contextual commands, e.g. end turn while recruit menu is open, cancel current context and end before performing their usual command
 
 disable input while AI takes turn
+
+have AI happen in another thread or in chunks over several frames (probably the latter to ease caching)
+
+--------------------
 
 multiple human players
 
@@ -24,4 +32,3 @@ main menu, options
 
 NOTES:
 =============
- misc: campfire nightmare recital

@@ -268,7 +268,7 @@ export class GameState
                 var enemy = move.occupied.get(dest.toString());
                 move.occupied.delete(source.toString());
                 move.action = {type: attack_to, from: source, to: dest};
-                move.upkeeps[unit.owner_id] -= unit_cost(unit.type);
+                move.upkeeps[unit.owner_id] -= unit_cost.get(unit.type);
                 move.occupied.get(dest.toString()).can_move = false;
                 moves.push(move);
             }
