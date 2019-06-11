@@ -20,7 +20,11 @@ Have non-contextual commands, e.g. end turn while recruit menu is open, cancel c
 
 disable input while AI takes turn
 
-have AI happen in another thread or in chunks over several frames (probably the latter to ease caching)
+Have MCTS kept between rounds and advanced, so it may improve as the game goes on
+
+improve heuristic
+
+consider C++ lib
 
 --------------------
 

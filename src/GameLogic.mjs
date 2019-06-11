@@ -26,7 +26,7 @@ export function heuristic(states, player_id)
         if (states[i].incomes[player_id] > best_score)
         {
             best_state = states[i];
-            best_score = best_state.incomes[player_id];
+            best_score = states[i].incomes[player_id];
         }
     }
     return best_state;

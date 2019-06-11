@@ -4,12 +4,12 @@ import * as events from "./misc/events.mjs";
 import * as GameLogic from "./GameLogic.mjs";
 import {unit_cost, hex_layout, black, grey} from "./misc/constants.mjs";
 import {lerpColour} from "./misc/utilities.mjs";
-import {MCTS, MonteCarloTreeSearchNode} from "./MCTS.mjs";
+import {MonteCarloTreeSearchNode} from "./MCTS.mjs";
 import {Unit} from "./Unit.mjs";
 import {aStar} from "./misc/aStar.mjs";
 import * as hexLib from "./misc/hex-functions.mjs";
 
-const time_for_MCTS = 5;
+const time_for_MCTS = 10*1000;
 
 export class MasterScene extends Phaser.Scene
 {
@@ -47,6 +47,8 @@ export class MasterScene extends Phaser.Scene
             this.registry.set("income"+player_id.toString(), 0);
         }
         this.world.events.emit(events.recalc_territories);
+
+        this.aiThinking = false;
 
         this.ui.setWorld(this.world);
         this.initEventHandlers();
@@ -169,19 +171,42 @@ export class MasterScene extends Phaser.Scene
             upkeeps.push(this.registry.get("upkeep"+player_id.toString()));
         }
         var state = new GameLogic.GameState(this.current_player, this.world.world, this.world.world_string_set, this.world.pathfinder, occupied, capitols, treasuries, incomes, upkeeps);
-        var root = new MonteCarloTreeSearchNode(null, state, this.current_player);
+        console.log("thinking begins");
+        this.aiThinking = true;
+        this.thinkingTime = time_for_MCTS;
+        this.MCTS = new MonteCarloTreeSearchNode(null, state, this.current_player);
+        this.thinks=0;
+    }
+
+    update(time, delta)
+    {
+        if (!this.aiThinking)
+            return;
         // run MCTS
-        var actions = MCTS(root, time_for_MCTS);
+        this.MCTS.MCTS();
+        this.thinks++;
+        this.thinkingTime -= delta;
+        if (this.thinkingTime <= 0)
+            this.finaliseAITurn();
+    }
+
+    finaliseAITurn()
+    {
+        console.log("total thinks: "+this.thinks.toString());
+        this.aiThinking = false;
+        this.thinks=0;
         // do each action sequentially
+        var delay = 0;
         var i = 0;
-        actions.forEach(function(a)
+        this.MCTS.finaliseMCTS().forEach(function(a)
         {
-            this.time.delayedCall(i*120+900, function()
+            delay += this.getActionDelay(a);
+            this.time.delayedCall(delay, function()
             {
                 this.handleAction(a);
             }, [], this);
-            i++;
         }, this);
+        console.log(this.MCTS);
     }
 
     // get all hexes that can be moved through by the given player, to be passed to an aStar
@@ -201,19 +226,39 @@ export class MasterScene extends Phaser.Scene
         return valid_positions;
     }
 
+    getActionDelay(action)
+    {
+        var delay;
+        if (action.type == GameLogic.move_to || action.type == GameLogic.attack_to || action.type == GameLogic.attack_bounce_to)
+        {
+            var unit = this.world.occupied.get(action.from.toString());
+            var dest = action.to;
+            var path = new aStar(this.getValidMovementHexes(unit), (action.type == GameLogic.attack_to || action.type == GameLogic.attack_bounce_to)).findPath(unit.hex, dest);
+            if (action.type == GameLogic.move_to)
+                delay = unit.getMoveToDelay(dest, path);
+            if (action.type == GameLogic.attack_to)
+                delay = unit.getAttackToDelay(dest, path);
+            if (action.type == GameLogic.attack_bounce_to)
+                delay = unit.getAttackToDelay(action.targ, path);
+        }
+        else if (action.type == GameLogic.recruit_at)
+            delay = 120;
+        else if (action.type == GameLogic.end_turn)
+            delay = 900;
+        else
+            throw("bogus gamelogic action")
+        return delay;
+    }
+
     // do animations for AI actions, set economy registries appropriately
     handleAction(action)
     {
-        console.log(action);
         if (action.type == GameLogic.move_to || action.type == GameLogic.attack_to || action.type == GameLogic.attack_bounce_to)
         {
             var unit = this.world.occupied.get(action.from.toString());
             this.world.occupied.delete(action.from.toString());
             var dest = action.to;
             var path = new aStar(this.getValidMovementHexes(unit), (action.type == GameLogic.attack_to || action.type == GameLogic.attack_bounce_to)).findPath(unit.hex, dest);
-            console.log(unit);
-            console.log(dest);
-            console.log(path);
             if (action.type == GameLogic.move_to)
                 unit.moveTo(dest, path);
             if (action.type == GameLogic.attack_to)

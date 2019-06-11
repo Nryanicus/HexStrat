@@ -1,30 +1,6 @@
 import * as GameLogic from "./GameLogic.mjs";
 import {shuffle} from "./misc/utilities.mjs";
 
-// return all actions until we end our turn
-export function MCTS(root, time)
-{
-    var start_time = Date.now();
-    while ((Date.now() - start_time) < 1000*time)
-    {
-        var leaf = root.traverse();
-        var result = leaf.simulate();
-        leaf.backpropagate(result);
-    }
-    var node = root.bestChild();
-    var actions = [node.state.action];
-    while (node.state.action.type != GameLogic.end_turn && node.children.length != 0)
-    {
-        node = node.bestChild();
-        actions.push(node.state.action);
-    }
-    if (actions[actions.length-1].type != GameLogic.end_turn)
-    {
-        actions.push({type: GameLogic.end_turn});
-    }
-    return actions;
-}
-
 export class MonteCarloTreeSearchNode
 {
     constructor(parent, state, player_id)
@@ -57,6 +33,33 @@ export class MonteCarloTreeSearchNode
                 best_child = this.children[i];
         }
         return best_child;
+    }
+
+    MCTS()
+    {
+        var leaf = this.traverse();
+        var result = leaf.simulate();
+        leaf.backpropagate(result);
+    }
+
+    // return all actions until we end our turn
+    finaliseMCTS()
+    {
+        var node = this.bestChild();
+        console.log("best child");
+        console.log(node);
+        var actions = [node.state.action];
+        while (node.state.action.type != GameLogic.end_turn && node.children.length != 0)
+        {
+            node = node.bestChild();
+            console.log(node);
+            actions.push(node.state.action);
+        }
+        if (actions[actions.length-1].type != GameLogic.end_turn)
+        {
+            actions.push({type: GameLogic.end_turn});
+        }
+        return actions;
     }
 
     // 

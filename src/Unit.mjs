@@ -315,6 +315,27 @@ export class Unit extends Phaser.GameObjects.Image
         }, this);
     }
 
+    getAttackToDelay(h_ult, path)
+    {
+        var delay = (path.length+4)*120;
+        // delay depends on result
+        var enemy = this.scene.occupied.get(h_ult.toString());
+        var result = combatResult(this.type, enemy.type);
+        if (result == victory)
+            delay += 120;
+        else if (result == defeat)
+            null;
+        else if (result == draw)
+            delay += 4*120;
+        else // attack cap
+        {
+            delay += 120;
+            if (enemy.lives == 1)
+                delay += 120;
+        }
+        return delay+600;
+    }
+
     attackTo(h_ult, path)
     {
         this.can_move = false;
@@ -336,7 +357,6 @@ export class Unit extends Phaser.GameObjects.Image
             i++;
         }, this);
 
-
         // hitstop
         var h_penult = path[path.length-1];
         var p_penult = hexLib.hex_to_pixel(hex_layout, h_penult);
@@ -348,7 +368,7 @@ export class Unit extends Phaser.GameObjects.Image
         var mid_p = {x: p_penult.x/2 + p_ult.x/2, y: p_penult.y/2 + p_ult.y/2};
 
         var enemy = this.scene.occupied.get(h_ult.toString());
-        var result = combatResult(this.type, enemy.type);
+        var result = combatResult(this, enemy);
 
         if (!enemy.can_move && result != attack_capitol)
             enemy.standUp(120*i);
@@ -540,6 +560,11 @@ export class Unit extends Phaser.GameObjects.Image
         this.greyOut(120*i);
     }
 
+    getMoveToDelay(h, path)
+    {
+        return path.length*120+600;
+    }
+
     moveTo(h, path)
     {
         this.can_move = h.toString() == this.hex.toString();
@@ -576,6 +601,7 @@ export class Unit extends Phaser.GameObjects.Image
         }, [], this);
 
         this.greyOut(120*i);
+        return 120*i+600;
     }
 
     greyOut(delay)
