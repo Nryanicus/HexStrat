@@ -2,6 +2,7 @@ import * as hexLib from "./misc/hex-functions.mjs";
 import {victory, defeat, draw, attack_capitol, sword, pike, cavalry, musket, capitol, unit_cost, unit_movement} from "./misc/constants.mjs";
 import {combatResult} from "./Unit.mjs";
 import {aStar} from "./misc/aStar.mjs";
+import {shuffle} from "./misc/utilities.mjs";
 import {determineTerritories} from "./world_functions.mjs";
 
 // GameLogic actions
@@ -11,30 +12,113 @@ export const attack_bounce_to = "attack_bounce_to"; // from, to, target
 export const recruit_at = "recruit_at"; // owner_id, unit_type, hex
 export const end_turn = "end_turn"; // next_player_id, incomes
 
-// pick the best state for the given player from a list of states
-// just pick states that give us the most money. Will implement other considerations later if needed
-export function heuristic(states, player_id)
+// more money is good
+function income_score(state, player_id)
 {
-    var best_state = states[0];
-    var best_score = states[0].incomes[player_id];
-    for (var i=1; i<states.length; i++)
-    {
-        // winning states are good
-        if (states[i].winner == player_id)
-            return states[i];
-        // more money is good
-        if (states[i].incomes[player_id] > best_score)
-        {
-            best_state = states[i];
-            best_score = states[i].incomes[player_id];
-        }
-    }
-    return best_state;
+    return state.incomes[player_id];
 }
+
+// having more troops is good
+function troop_score(state, player_id)
+{
+    var score = 0;
+    state.occupied.forEach(function(unit, hex, map)
+    {
+        if (unit.owner_id == player_id)
+            score++;
+        else
+            score--;
+    });
+    return score;
+}
+
+// taking away opponents' lives is good
+// having more lives than opponents' is better
+function life_score(state, player_id)
+{
+    var score = 0;
+    for (var i=0; i<state.num_players; i++)
+    {
+        if (i == player_id) 
+            score += 3*state.capitols[i].lives;
+        else
+            score -= state.capitols[i].lives;
+    }
+    return score;
+    }
+
+// pick the best state for the given player from a list of states
+export function heuristic(states, player_id)
+{   
+
+    function heuristic_filter(states, score, player_id)
+    {
+        if (states.length == 1)
+            return [states[0]];
+        var best_state = states[0];
+        var best_score = score(best_state);
+        var bests = [best_state];
+        for (var i=1; i<states.length; i++)
+        {
+            // winning states are good
+            if (states[i].winner == player_id)
+                return states[i];
+            // otherwise score according to score function
+            var s = score(states[i], player_id)
+            if (s > best_score)
+            {
+                best_state = states[i];
+                best_score = s;
+                bests = [best_state];
+            }
+            else if (s == best_score)
+                bests.push(states[i]);
+        }
+        return bests
+    }
+
+    var bests = heuristic_filter(states, income_score, player_id);
+    bests = heuristic_filter(bests, troop_score, player_id);
+    bests = heuristic_filter(bests, life_score, player_id);
+    bests = shuffle(bests);
+    return bests[0];
+}
+
+function evaluation(state, player_id)
+{
+    // score on various metrics relative to the strongest player in those fields
+    var total_score = 0;
+    var metrics = [income_score, troop_score, life_score]
+    metrics.forEach(function(score)
+    {
+        var highest_score = score(state, 0);
+        var best_player = 0;
+        var scores = [highest_score];
+        for (var i=1; i<state.num_players; i++)
+        {
+            var s = score(state, i);
+            scores.push(s);
+            if (s > highest_score)
+            {
+                highest_score = s;
+                best_player = i;
+            }
+        }
+        // full points for being the best
+        if (best_player == player_id)
+            total_score += 1/metrics.length;
+        // otherwise normalise to the better player
+        else
+            total_score += scores[player_id]/highest_score/metrics.length;
+    });
+    return total_score;
+}
+
+var GameStateCache = new Map();
 
 export class GameState
 {
-    constructor(current_player, world, world_hex_set, pathfinder, occupied, capitols, treasuries, incomes, upkeeps)
+    constructor(id, current_player, world, world_hex_set, pathfinder, occupied, capitols, treasuries, incomes, upkeeps)
     {
         this.gameOver = false;
         this.winner = -1;
@@ -52,6 +136,10 @@ export class GameState
 
         // used for rendering, the action taken to reach this state from the previous one
         this.action;
+
+        // cache
+        this.id = id;
+        this.child_id = -1;
     }
 
     clone()
@@ -71,7 +159,7 @@ export class GameState
             var copy = {hex: c.hex, lives: c.lives};
             capitols.push(copy);
         }, this);
-        return new GameState(this.current_player, this.world, this.world_hex_set, this.pathfinder, occupied, capitols, treasuries, incomes, upkeeps);
+        return new GameState(this.id+(this.child_id++).toString(),this.current_player, this.world, this.world_hex_set, this.pathfinder, occupied, capitols, treasuries, incomes, upkeeps);
     }
 
     updateIncomes()
@@ -166,6 +254,9 @@ export class GameState
     // return a list of all valid moves from a the current game state
     getValidMoves()
     {
+        if (GameStateCache.has(this.id))
+            return GameStateCache.get(this.id);
+
         var moves = [];
 
         // skip to end turn if the player is dead
@@ -196,6 +287,8 @@ export class GameState
         }
         // end turn
         moves.push(this.endTurnMove());
+        GameStateCache.set(this.id, moves);
+
         return moves;
     }
 
@@ -229,6 +322,7 @@ export class GameState
                 move.treasuries[this.current_player] -= c;
                 move.upkeeps[this.current_player] += c;
                 move.action = {type: recruit_at, unit_type: type, owner_id: this.current_player, hex: h};
+                move.updateIncomes();
                 moves.push(move);
             }, this);
         }, this);
@@ -259,6 +353,7 @@ export class GameState
                 var enemy = move.occupied.get(dest.toString());
                 move.upkeeps[enemy.owner_id] -= unit_cost.get(enemy.type);
                 move.action = {type: attack_to, from: source, to: dest};
+                move.updateIncomes();
                 moves.push(move);
             }
             else if (result == defeat)
@@ -270,6 +365,7 @@ export class GameState
                 move.action = {type: attack_to, from: source, to: dest};
                 move.upkeeps[unit.owner_id] -= unit_cost.get(unit.type);
                 move.occupied.get(dest.toString()).can_move = false;
+                move.updateIncomes();
                 moves.push(move);
             }
             else if (result == draw)
@@ -277,19 +373,19 @@ export class GameState
                 hexLib.hex_ring(dest, 1).forEach(function(h)
                 {
                     var path = pf.findPath(source, h);;
-                    if (path.length > unit.move_range)
-                        return;
                     move = this.clone();
                     var unit = move.occupied.get(source.toString());
+                    if (path.length > unit.move_range)
+                        return;
                     var enemy = move.occupied.get(dest.toString());
                     move.occupied.set(h.toString(), unit);
                     move.occupied.delete(source.toString());
                     unit.can_move = false;
                     enemy.can_move = false;
                     move.action = {type: attack_bounce_to, from: source, to: h, target: dest};
+                    move.updateIncomes();
                     moves.push(move);
                 }, this);
-                return;
             }
             else // attack cap
             {
@@ -302,12 +398,16 @@ export class GameState
                     move.removeAllUnits(enemy.owner_id);
                     move.occupied.set(dest.toString(), unit);
                     move.checkGameOver();
+                    move.updateIncomes();
                     moves.push(move);
                 }
                 else
                 {
                     hexLib.hex_ring(dest, 1).forEach(function(h)
                     {
+                        var move = this.clone();
+                        var unit = move.occupied.get(source.toString());
+                        unit.can_move = false;
                         var path = pf.findPath(source, h);;
                         if (path.length > unit.move_range)
                             return;
@@ -315,6 +415,7 @@ export class GameState
                         move.occupied.set(h.toString(), unit);
                         move.occupied.delete(source.toString());
                         move.action = {type: attack_bounce_to, from: source, to: h, target: dest};
+                        move.updateIncomes();
                         moves.push(move);
                     }, this);
                 }
@@ -329,12 +430,21 @@ export class GameState
     simulate(player_id)
     {
         var state = this;
-        while (!state.gameOver)
+        var max_depth = 5;
+        var depth = 0;
+        while ((!state.gameOver) && depth < max_depth)
         {
-            state = heuristic(state.getValidMoves(), state.current_player);
+            prev = moves;
+            var moves = state.getValidMoves();
+
+            prev_state = state;
+            state = heuristic(moves, state.current_player);
+
             if (state.action.type == end_turn)
-                return 0;
+                depth++;
         }
+        if (!state.gameOver)
+            return evaluation(state, player_id);
         if (state.winner == player_id)
             return 1;
         return -1;

@@ -19,7 +19,8 @@ export class MonteCarloTreeSearchNode
 
     getUpperConfidenceBound()
     {
-        return this.reward/this.backpropagation_visits + Math.sqrt( Math.log(this.parent.backpropagation_visits) / this.backpropagation_visits);
+        // C = 0.5 since we don't have that much time
+        return this.reward/this.backpropagation_visits + 0.5*Math.sqrt( Math.log(this.parent.backpropagation_visits) / this.backpropagation_visits);
     }
 
     getBestUpperConfidenceBoundChild()
@@ -46,13 +47,10 @@ export class MonteCarloTreeSearchNode
     finaliseMCTS()
     {
         var node = this.bestChild();
-        console.log("best child");
-        console.log(node);
         var actions = [node.state.action];
         while (node.state.action.type != GameLogic.end_turn && node.children.length != 0)
         {
             node = node.bestChild();
-            console.log(node);
             actions.push(node.state.action);
         }
         if (actions[actions.length-1].type != GameLogic.end_turn)
@@ -110,9 +108,22 @@ export class MonteCarloTreeSearchNode
     bestChild()
     {
         var best = this.children[0];
+        if (this.children.length == 1)
+            return best;
+        var bests = [];
         for (var i=1; i<this.children.length; i++)
+        {
             if (this.children[i].backpropagation_visits > best.backpropagation_visits)
+            {
                 best = this.children[i];
-        return best;
+                bests = [best];
+            }
+            else if (this.children[i].backpropagation_visits == best.backpropagation_visits)
+            {
+                bests.push(this.children[i]);
+            }
+        }
+        bests = shuffle(bests);
+        return bests[0];
     }
 }

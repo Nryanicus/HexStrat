@@ -9,7 +9,7 @@ import {Unit} from "./Unit.mjs";
 import {aStar} from "./misc/aStar.mjs";
 import * as hexLib from "./misc/hex-functions.mjs";
 
-const time_for_MCTS = 10*1000;
+const time_for_MCTS = 10;
 
 export class MasterScene extends Phaser.Scene
 {
@@ -170,8 +170,7 @@ export class MasterScene extends Phaser.Scene
             incomes.push(this.registry.get("income"+player_id.toString()));
             upkeeps.push(this.registry.get("upkeep"+player_id.toString()));
         }
-        var state = new GameLogic.GameState(this.current_player, this.world.world, this.world.world_string_set, this.world.pathfinder, occupied, capitols, treasuries, incomes, upkeeps);
-        console.log("thinking begins");
+        var state = new GameLogic.GameState("0", this.current_player, this.world.world, this.world.world_string_set, this.world.pathfinder, occupied, capitols, treasuries, incomes, upkeeps);
         this.aiThinking = true;
         this.thinkingTime = time_for_MCTS;
         this.MCTS = new MonteCarloTreeSearchNode(null, state, this.current_player);
@@ -192,7 +191,6 @@ export class MasterScene extends Phaser.Scene
 
     finaliseAITurn()
     {
-        console.log("total thinks: "+this.thinks.toString());
         this.aiThinking = false;
         this.thinks=0;
         // do each action sequentially
@@ -206,7 +204,6 @@ export class MasterScene extends Phaser.Scene
                 this.handleAction(a);
             }, [], this);
         }, this);
-        console.log(this.MCTS);
     }
 
     // get all hexes that can be moved through by the given player, to be passed to an aStar
@@ -239,7 +236,7 @@ export class MasterScene extends Phaser.Scene
             if (action.type == GameLogic.attack_to)
                 delay = unit.getAttackToDelay(dest, path);
             if (action.type == GameLogic.attack_bounce_to)
-                delay = unit.getAttackToDelay(action.targ, path);
+                delay = unit.getAttackToDelay(action.target, path);
         }
         else if (action.type == GameLogic.recruit_at)
             delay = 120;
