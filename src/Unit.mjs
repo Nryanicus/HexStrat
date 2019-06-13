@@ -1,4 +1,5 @@
 import {aStar} from "./misc/aStar.mjs";
+import {combatResult} from "./GameLogic.mjs";
 import {sword, pike, cavalry, musket, capitol, hex_layout, grey, black, red, white, exclude_death_pixel, death_pixel_dirc, one_normal, unit_movement, victory, defeat, draw, attack_capitol} from "./misc/constants.mjs";
 import {lerpColour, getRandomFloat, range, getRandomInt} from "./misc/utilities.mjs";
 import * as hexLib from "./misc/hex-functions.mjs";
@@ -6,50 +7,6 @@ import * as events from "./misc/events.mjs";
 
 // exceptions
 const BogusAttackDirection = "bogus attack direction";
-const BogusUnitType = "bogus unit type";
-
-export function combatResult(a, b)
-{
-    if (b.type == capitol)
-        return attack_capitol;
-    if (a.type == musket && b.type == musket)
-        return draw;
-    if (a.type == musket)
-        return victory;
-    if (b.type == musket)
-        return victory;
-    if (a.type == sword)
-    {
-        if (b.type == sword)
-            return draw;
-        if (b.type == pike)
-            return victory;
-        if (b.type == cavalry)
-            return defeat;
-    }
-    else if (a.type == pike)
-    {
-        if (b.type == pike)
-            return draw;
-        if (b.type == cavalry)
-            return victory;
-        if (b.type == sword)
-            return defeat;
-    }
-    else if (a.type == cavalry)
-    {
-        if (b.type == cavalry)
-            return draw;
-        if (b.type == sword)
-            return victory;
-        if (b.type == pike)
-            return defeat;
-    }
-    console.log(BogusUnitType);
-    console.log(a.type);
-    console.log(b.type);
-    throw(BogusUnitType);
-}
 
 function get_attack_indication(h)
 {
@@ -153,16 +110,7 @@ export class Unit extends Phaser.GameObjects.Image
         this.scene.registry.set(events.unit_to_place, utp);
 
         // determine where the unit can be placed
-        var valid_positions = new Set();
-        hexLib.hex_spiral(this.hex, this.move_range+1).forEach(function(h)
-        {
-            if (!this.scene.world_string_set.has(h.toString()))
-                return;
-            if (this.scene.occupied.has(h.toString()) && this.scene.occupied.get(h.toString()).owner_id != this.owner_id)
-                return;
-            valid_positions.add(h.toString());
-        }, this);
-
+        var valid_positions = this.gameState.getValidMovementHexes(this, this.hex);
         var possible_destinations = [this.hex];
         var possible_paths = new Map([[this.hex.toString(), []]]);
         var dest_is_attack = new Map([[this.hex.toString(), false]]);
@@ -368,7 +316,7 @@ export class Unit extends Phaser.GameObjects.Image
         var mid_p = {x: p_penult.x/2 + p_ult.x/2, y: p_penult.y/2 + p_ult.y/2};
 
         var enemy = this.scene.occupied.get(h_ult.toString());
-        var result = combatResult(this, enemy);
+        var result = combatResult(this.type, enemy.type);
 
         if (!enemy.can_move && result != attack_capitol)
             enemy.standUp(120*i);

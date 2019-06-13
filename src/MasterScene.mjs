@@ -21,16 +21,16 @@ export class MasterScene extends Phaser.Scene
 
     create()
     {
-        this.current_player = 0;
-        this.num_players = 2;
-        this.ai_players = [false, true];
+        this.currentPlayer = 0;
+        this.numPlayers = 2;
+        this.aiPlayers = [false, true];
 
         this.initNewWorld();
     }
 
     initNewWorld()
     {
-        this.registry.set(events.current_player, 0)
+        this.registry.set(events.currentPlayer, 0)
         this.registry.set(events.can_gen, false)
         this.scene.remove('world');
         this.scene.remove('ui');
@@ -40,7 +40,7 @@ export class MasterScene extends Phaser.Scene
         this.ui = this.scene.get('ui');
         this.world = this.scene.get('world');
 
-        for (var player_id=0; player_id<this.num_players; player_id++)
+        for (var player_id=0; player_id<this.numPlayers; player_id++)
         {
             this.registry.set("treasury"+player_id.toString(), 21);
             this.registry.set("upkeep"+player_id.toString(), 0);
@@ -69,6 +69,11 @@ export class MasterScene extends Phaser.Scene
                 this.initNewWorld();
         }, this);
 
+        this.input.keyboard.on('keydown-X', function (event) 
+        {
+            console.log(this.world.occupied);
+        }, this);
+
         // game logic events
         this.world.events.on(events.recruit_attempt, function(unit_type, player_id)
         {
@@ -93,7 +98,7 @@ export class MasterScene extends Phaser.Scene
         this.world.events.on(events.territory_change, function()
         {   
             var incomes = [];
-            for (var i = 0; i < this.num_players; i++)
+            for (var i = 0; i < this.numPlayers; i++)
                 incomes.push(0);
             this.world.territories.forEach(function(owner_id, string, map)
             {
@@ -101,7 +106,7 @@ export class MasterScene extends Phaser.Scene
                     return;
                 incomes[owner_id]++;
             }, this);
-            for (var i = 0; i < this.num_players; i++)
+            for (var i = 0; i < this.numPlayers; i++)
                 this.registry.set("income"+i.toString(), incomes[i]);
         }, this);
 
@@ -125,10 +130,10 @@ export class MasterScene extends Phaser.Scene
 
     endTurn()
     {
-        this.current_player++;
-        if (this.current_player == this.num_players)
+        this.currentPlayer++;
+        if (this.currentPlayer == this.numPlayers)
         {
-            for (var player_id=0; player_id<this.num_players; player_id++)
+            for (var player_id=0; player_id<this.numPlayers; player_id++)
             {
                 var inc = this.registry.get("income"+player_id.toString());
                 var up = this.registry.get("upkeep"+player_id.toString());
@@ -137,90 +142,57 @@ export class MasterScene extends Phaser.Scene
                 if (this.registry.get("treasury"+player_id.toString()) < 0)
                     this.world.events.emit(events.player_bankrupt, player_id);
             }
-            this.current_player = 0;
+            this.currentPlayer = 0;
             this.world.events.emit(events.end_round);
         }
-        if (this.ai_players[this.current_player])
-            this.handleAITurn();
-        else // TODO, multiple human players
-            null;
+        // if (this.aiPlayers[this.currentPlayer])
+        //     this.handleAITurn();
+        // else // TODO, multiple human players
+        //     null;
     }
 
     handleAITurn()
     {
-        // construct current game state
-        var occupied = new Map();
-        this.world.occupied.forEach(function(unit, hex, map)
-        {
-            occupied.set(hex, {type:unit.type, owner_id:unit.owner_id, can_move:unit.can_move})
-        }, this);
+        // // construct current game state
+        // var occupied = new Map();
+        // this.world.occupied.forEach(function(unit, hex, map)
+        // {
+        //     occupied.set(hex, {type:unit.type, owner_id:unit.owner_id, can_move:unit.can_move})
+        // }, this);
 
-        var capitols = [];
-        var treasuries = [];
-        var incomes = [];
-        var upkeeps = [];
-        for (var player_id=0; player_id<this.num_players; player_id++)
-        {
-            var cap_pos = this.world.capitol_positions[player_id];
-            if (this.world.occupied.has(cap_pos.toString()))
-                capitols.push({hex: cap_pos, lives: this.world.occupied.get(cap_pos.toString()).lives});
-            else
-                capitols.push({hex: cap_pos, lives: 0});
-            treasuries.push(this.registry.get("treasury"+player_id.toString()));
-            incomes.push(this.registry.get("income"+player_id.toString()));
-            upkeeps.push(this.registry.get("upkeep"+player_id.toString()));
-        }
-        var state = new GameLogic.GameState("0", this.current_player, this.world.world, this.world.world_string_set, this.world.pathfinder, occupied, capitols, treasuries, incomes, upkeeps);
-        this.aiThinking = true;
-        this.thinkingTime = time_for_MCTS;
-        this.MCTS = new MonteCarloTreeSearchNode(null, state, this.current_player);
-        this.thinks=0;
-    }
-
-    update(time, delta)
-    {
-        if (!this.aiThinking)
-            return;
-        // run MCTS
-        this.MCTS.MCTS();
-        this.thinks++;
-        this.thinkingTime -= delta;
-        if (this.thinkingTime <= 0)
-            this.finaliseAITurn();
-    }
-
-    finaliseAITurn()
-    {
-        this.aiThinking = false;
-        this.thinks=0;
-        // do each action sequentially
-        var delay = 0;
-        var i = 0;
-        this.MCTS.finaliseMCTS().forEach(function(a)
-        {
-            delay += this.getActionDelay(a);
-            this.time.delayedCall(delay, function()
-            {
-                this.handleAction(a);
-            }, [], this);
-        }, this);
-    }
-
-    // get all hexes that can be moved through by the given player, to be passed to an aStar
-    // TODO: refactor, this code gets used in Unit.mjs and MasterScene.mjs
-    getValidMovementHexes(unit)
-    {
-        // determine where the unit can be placed
-        var valid_positions = new Set();
-        hexLib.hex_spiral(unit.hex, unit.move_range+1).forEach(function(h)
-        {
-            if (!this.world.world_string_set.has(h.toString()))
-                return;
-            if (this.world.occupied.has(h.toString()) && this.world.occupied.get(h.toString()).owner_id != unit.owner_id)
-                return;
-            valid_positions.add(h.toString());
-        }, this);
-        return valid_positions;
+        // var capitols = [];
+        // var treasuries = [];
+        // var incomes = [];
+        // var upkeeps = [];
+        // for (var player_id=0; player_id<this.numPlayers; player_id++)
+        // {
+        //     var cap_pos = this.world.capitol_positions[player_id];
+        //     if (this.world.occupied.has(cap_pos.toString()))
+        //         capitols.push({hex: cap_pos, lives: this.world.occupied.get(cap_pos.toString()).lives});
+        //     else
+        //         capitols.push({hex: cap_pos, lives: 0});
+        //     treasuries.push(this.registry.get("treasury"+player_id.toString()));
+        //     incomes.push(this.registry.get("income"+player_id.toString()));
+        //     upkeeps.push(this.registry.get("upkeep"+player_id.toString()));
+        // }
+        // var state = new GameLogic.GameState(this.currentPlayer, this.world.world, this.world.world_string_set, this.world.pathfinder, occupied, capitols, treasuries, incomes, upkeeps);
+        // var actions = [];
+        // while ((!state.gameOver))
+        // {
+        //     var moves = state.getValidMoves();
+        //     state = GameLogic.heuristic(moves, state.currentPlayer);
+        //     actions.push(state.action);
+        //     if (state.action.type == GameLogic.end_turn) break;
+        // }
+        // var delay = 0;
+        // actions.forEach(function(a)
+        // {
+        //     delay += this.getActionDelay(a);
+        //     this.time.delayedCall(delay, function()
+        //     {
+        //         this.handleAction(a);
+        //     }, [], this);
+        // }, this);
     }
 
     getActionDelay(action)
@@ -230,7 +202,7 @@ export class MasterScene extends Phaser.Scene
         {
             var unit = this.world.occupied.get(action.from.toString());
             var dest = action.to;
-            var path = new aStar(this.getValidMovementHexes(unit), (action.type == GameLogic.attack_to || action.type == GameLogic.attack_bounce_to)).findPath(unit.hex, dest);
+            var path = new aStar(this.gameState.getValidMovementHexes(unit), (action.type == GameLogic.attack_to || action.type == GameLogic.attack_bounce_to)).findPath(unit.hex, dest);
             if (action.type == GameLogic.move_to)
                 delay = unit.getMoveToDelay(dest, path);
             if (action.type == GameLogic.attack_to)
@@ -250,6 +222,7 @@ export class MasterScene extends Phaser.Scene
     // do animations for AI actions, set economy registries appropriately
     handleAction(action)
     {
+        console.log(action);
         if (action.type == GameLogic.move_to || action.type == GameLogic.attack_to || action.type == GameLogic.attack_bounce_to)
         {
             var unit = this.world.occupied.get(action.from.toString());
@@ -259,7 +232,7 @@ export class MasterScene extends Phaser.Scene
             if (action.type == GameLogic.move_to)
                 unit.moveTo(dest, path);
             if (action.type == GameLogic.attack_to)
-                unit.attackTo(dest, path);
+                unit.attackTo(dest, path.slice(1, path.length));
             if (action.type == GameLogic.attack_bounce_to)
                 unit.attackTo(action.targ, path);
         }

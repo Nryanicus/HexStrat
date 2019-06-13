@@ -1,9 +1,13 @@
 import * as hexLib from "./misc/hex-functions.mjs";
 import {victory, defeat, draw, attack_capitol, sword, pike, cavalry, musket, capitol, unit_cost, unit_movement} from "./misc/constants.mjs";
-import {combatResult} from "./Unit.mjs";
 import {aStar} from "./misc/aStar.mjs";
 import {shuffle} from "./misc/utilities.mjs";
 import {determineTerritories} from "./world_functions.mjs";
+
+// exceptions
+export const BadTransistion = "BadTransistion";
+export const BadPlayerId = "BadPlayerId";
+const BogusUnitType = "bogus unit type";
 
 // GameLogic actions
 export const move_to = "move_to"; // from, to
@@ -12,136 +16,78 @@ export const attack_bounce_to = "attack_bounce_to"; // from, to, target
 export const recruit_at = "recruit_at"; // owner_id, unit_type, hex
 export const end_turn = "end_turn"; // next_player_id, incomes
 
-// more money is good
-function income_score(state, player_id)
+export function combatResult(a, b)
 {
-    return state.incomes[player_id];
-}
-
-// having more troops is good
-function troop_score(state, player_id)
-{
-    var score = 0;
-    state.occupied.forEach(function(unit, hex, map)
+    if (b == capitol)
+        return attack_capitol;
+    if (a == musket && b == musket)
+        return draw;
+    if (a == musket)
+        return victory;
+    if (b == musket)
+        return victory;
+    if (a == sword)
     {
-        if (unit.owner_id == player_id)
-            score++;
-        else
-            score--;
-    });
-    return score;
-}
-
-// taking away opponents' lives is good
-// having more lives than opponents' is better
-function life_score(state, player_id)
-{
-    var score = 0;
-    for (var i=0; i<state.num_players; i++)
-    {
-        if (i == player_id) 
-            score += 3*state.capitols[i].lives;
-        else
-            score -= state.capitols[i].lives;
+        if (b == sword)
+            return draw;
+        if (b == pike)
+            return victory;
+        if (b == cavalry)
+            return defeat;
     }
-    return score;
-    }
-
-// pick the best state for the given player from a list of states
-export function heuristic(states, player_id)
-{   
-
-    function heuristic_filter(states, score, player_id)
+    else if (a == pike)
     {
-        if (states.length == 1)
-            return [states[0]];
-        var best_state = states[0];
-        var best_score = score(best_state);
-        var bests = [best_state];
-        for (var i=1; i<states.length; i++)
-        {
-            // winning states are good
-            if (states[i].winner == player_id)
-                return states[i];
-            // otherwise score according to score function
-            var s = score(states[i], player_id)
-            if (s > best_score)
-            {
-                best_state = states[i];
-                best_score = s;
-                bests = [best_state];
-            }
-            else if (s == best_score)
-                bests.push(states[i]);
-        }
-        return bests
+        if (b == pike)
+            return draw;
+        if (b == cavalry)
+            return victory;
+        if (b == sword)
+            return defeat;
     }
-
-    var bests = heuristic_filter(states, income_score, player_id);
-    bests = heuristic_filter(bests, troop_score, player_id);
-    bests = heuristic_filter(bests, life_score, player_id);
-    bests = shuffle(bests);
-    return bests[0];
-}
-
-function evaluation(state, player_id)
-{
-    // score on various metrics relative to the strongest player in those fields
-    var total_score = 0;
-    var metrics = [income_score, troop_score, life_score]
-    metrics.forEach(function(score)
+    else if (a == cavalry)
     {
-        var highest_score = score(state, 0);
-        var best_player = 0;
-        var scores = [highest_score];
-        for (var i=1; i<state.num_players; i++)
-        {
-            var s = score(state, i);
-            scores.push(s);
-            if (s > highest_score)
-            {
-                highest_score = s;
-                best_player = i;
-            }
-        }
-        // full points for being the best
-        if (best_player == player_id)
-            total_score += 1/metrics.length;
-        // otherwise normalise to the better player
-        else
-            total_score += scores[player_id]/highest_score/metrics.length;
-    });
-    return total_score;
+        if (b == cavalry)
+            return draw;
+        if (b == sword)
+            return victory;
+        if (b == pike)
+            return defeat;
+    }
+    console.log(BogusUnitType);
+    console.log(a);
+    console.log(b);
+    throw(BogusUnitType);
 }
-
-var GameStateCache = new Map();
 
 export class GameState
 {
-    constructor(id, current_player, world, world_hex_set, pathfinder, occupied, capitols, treasuries, incomes, upkeeps)
+    constructor(current_player, world, world_hex_set, pathfinder, occupied, capitols, treasuries, incomes, upkeeps)
     {
+        // shorthand for readability
+        this.num_players = treasuries.length;
+
+        // terminal state info
         this.gameOver = false;
         this.winner = -1;
 
+        // main features of most states
         this.current_player = current_player
-        this.num_players = treasuries.length;
         this.treasuries = treasuries;
         this.incomes = incomes;
         this.upkeeps = upkeeps;
         this.capitols = capitols; // {hex, lives}
-        this.world_hex_set = world_hex_set;
-        this.world = world;
         this.occupied = occupied; // Hex.toString : {type, owner_id, can_move}
-        this.pathfinder = pathfinder;
 
-        // used for rendering, the action taken to reach this state from the previous one
+        // pathfinding params. Both global for territory assigning and general for unit pathfinding
+        this.world_pathfinder = pathfinder;
+        this.world = world;
+        this.world_hex_set = world_hex_set;
+        
+        // the action taken to reach this state from the previous one, used for rendering
         this.action;
-
-        // cache
-        this.id = id;
-        this.child_id = -1;
     }
 
+    // create a deep copy of this game state, so it may be modified to reflect a move without side effects
     clone()
     {
         var treasuries = Array.from(this.treasuries);
@@ -159,9 +105,10 @@ export class GameState
             var copy = {hex: c.hex, lives: c.lives};
             capitols.push(copy);
         }, this);
-        return new GameState(this.id+(this.child_id++).toString(),this.current_player, this.world, this.world_hex_set, this.pathfinder, occupied, capitols, treasuries, incomes, upkeeps);
+        return new GameState(this.current_player, this.world, this.world_hex_set, this.world_pathfinder, occupied, capitols, treasuries, incomes, upkeeps);
     }
 
+    // set incomes for current unit positions
     updateIncomes()
     {
         var players = [];
@@ -172,7 +119,7 @@ export class GameState
             players[unit.owner_id].push(hexLib.Hex.prototype.fromString(hex));
         });
         var t, c;
-        [t ,c] = determineTerritories(this.world, players, this.pathfinder);
+        [t ,c] = determineTerritories(this.world, players, this.world_pathfinder);
         this.incomes = [];
         for (var i = 0; i < this.num_players; i++)
             this.incomes.push(0);
@@ -184,6 +131,7 @@ export class GameState
         }, this);
     }
 
+    // see if the current game state is terminal, if so find the winner
     checkGameOver()
     {
         var alive_caps = 0;
@@ -203,7 +151,6 @@ export class GameState
     }
         
     // get all hexes that can be moved through by the given player, to be passed to an aStar
-    // TODO: refactor, this code gets used in Unit.mjs and MasterScene.mjs
     getValidMovementHexes(unit, hex)
     {
         // determine where the unit can be placed
@@ -229,6 +176,7 @@ export class GameState
         }, this);
     }
 
+    // increment current player, do end of round updates if appropriate
     endTurn()
     {
         this.current_player = 0;
@@ -247,49 +195,147 @@ export class GameState
         }, this);
     }
 
-    // big ol' TODO:
-    // refactor current scenes to use GameLogic and refactor below cases to give specific nodes from specific input
-    // and a reverse map, give output from a given state transistion
+    ///////////////////////////////////////////////
+    //        transistion legality checks        //
+    ///////////////////////////////////////////////
 
-    // return a list of all valid moves from a the current game state
-    getValidMoves()
+    canRecruit(hex, type, player_id)
     {
-        if (GameStateCache.has(this.id))
-            return GameStateCache.get(this.id);
+        if (player_id >= this.num_players)
+            throw(BadPlayerId);
+        var cost = unit_cost.get(type);
+        var cap_ring = hexLib.hex_spiral(this.capitols[player_id].hex, 1);
+        return  this.current_player == player_id &&
+                cost <= this.treasuries[player_id] &&
+                !this.occupied.has(hex.toString()) &&
+                this.world_hex_set.has(hex.toString()) &&
+                cap_ring.includes(hex);
+    }
 
-        var moves = [];
+    canMove(source, dest, pf, player_id)
+    {
+        var path = pf.findPath(source, dest);
+        if (player_id >= this.num_players)
+            throw(BadPlayerId);
+        return  this.current_player == player_id &&
+                !this.occupied.has(dest.toString()) &&
+                this.world_hex_set.has(dest.toString()) &&
+                this.occupied.has(source.toString()) &&
+                this.occupied.get(source.toString()).owner_id == player_id &&
+                this.occupied.get(source.toString()).can_move &&
+                path.length <= this.occupied.get(source.toString()).move_range;
+    }
 
-        // skip to end turn if the player is dead
-        if (this.capitols[this.current_player].lives != 0)
+    canAttackFromDirection(source, dest, penult, pf, player_id)
+    {
+        if (player_id >= this.num_players)
+            throw(BadPlayerId);
+        var path = pf.findPath(source, dest);
+        return  this.current_player == player_id &&
+                this.occupied.has(dest.toString()) &&
+                this.occupied.has(dest.toString()).owner_id != player_id &&
+                !this.occupied.has(penult.toString()) &&
+                this.occupied.has(source.toString()) &&
+                this.occupied.get(source.toString()).owner_id == player_id &&
+                this.occupied.get(source.toString()).can_move &&
+                path.length <= this.occupied.get(source.toString()).move_range;
+    }
+
+    ///////////////////////////////////////////////
+    //       transistion functions               //
+    ///////////////////////////////////////////////
+
+    // return resulting GameState from a recruit action
+    recruitMove(hex, type, player_id)
+    {
+        if (!this.canRecruit(hex, type, player_id))
+            throw(BadTransistion);
+        var move = this.clone();
+        move.occupied.set(hex.toString(), {type: type, owner_id: player_id, can_move: false});
+        var cost = unit_cost.get(type);
+        move.treasuries[player_id] -= cost;
+        move.upkeeps[player_id] += cost;
+        move.action = {type: recruit_at, unit_type: type, owner_id: player_id, hex: hex};
+        move.updateIncomes();
+        return move;
+    }
+
+    movementMove(source, dest, pf, player_id)
+    {
+        if (!this.canMove(source, dest, pf, player_id))
+            throw(BadTransistion);
+        var move = this.clone();
+        var unit = move.occupied.get(source.toString());
+        move.action = {type: move_to, from: source, to: dest};
+        move.occupied.set(dest.toString(), unit);
+        move.occupied.delete(source.toString());
+        unit.can_move = false;
+        move.updateIncomes();
+        return move;
+    }
+
+    attackMove(source, dest, penult, pf, player_id)
+    {
+        if (!this.canAttackFromDirection(source, dest, penult, pf, player_id))
+            throw(BadTransistion);
+
+        var move;
+        var result = combatResult(this.occupied.get(source.toString()).type, this.occupied.get(dest.toString()).type);
+        if (result == victory)
         {
-            moves = moves.concat(this.recruitMoves());
-            // possible movements
-            this.occupied.forEach(function(unit, hex, map)
-            {
-                if (unit.owner_id != this.current_player || !unit.can_move)
-                    return;
-                hex = hexLib.Hex.prototype.fromString(hex);
-                var pf = new aStar(this.getValidMovementHexes(unit, hex), true);
-                hexLib.hex_spiral(hex, unit_movement.get(unit.type)+1).forEach(function(hc)
-                {
-                    if (!this.world_hex_set.has(hc.toString()))
-                        return;
-                    if (pf.findPath(hex, hc).length > unit.move_range)
-                        return;
-                    // attack move
-                    if (this.occupied.has(hc.toString()))
-                        moves = moves.concat(this.attackMoves(hex, hc, pf));
-                    // normal move
-                    else
-                        moves.push(this.movementMove(hex, hc));
-                }, this);
-            }, this);
+            move = this.movementMove(source, dest);
+            var enemy = move.occupied.get(dest.toString());
+            move.upkeeps[enemy.owner_id] -= unit_cost.get(enemy.type);
+            move.action = {type: attack_to, from: source, to: dest};
         }
-        // end turn
-        moves.push(this.endTurnMove());
-        GameStateCache.set(this.id, moves);
-
-        return moves;
+        else if (result == defeat)
+        {
+            move = this.clone();
+            var unit = move.occupied.get(source.toString());
+            var enemy = move.occupied.get(dest.toString());
+            move.occupied.delete(source.toString());
+            move.action = {type: attack_to, from: source, to: dest};
+            move.upkeeps[unit.owner_id] -= unit_cost.get(unit.type);
+            enemy.can_move = false;
+        }
+        else if (result == draw)
+        {
+            move = this.clone();
+            var unit = move.occupied.get(source.toString());
+            var enemy = move.occupied.get(dest.toString());
+            move.occupied.set(penult.toString(), unit);
+            move.occupied.delete(source.toString());
+            unit.can_move = false;
+            enemy.can_move = false;
+            move.action = {type: attack_bounce_to, from: source, to: penult, target: dest};
+        }
+        else // attack cap
+        {
+            if (!result == attack_capitol)
+                throw(BadTransistion);
+            move = this.clone();
+            var unit = move.occupied.get(source.toString());
+            unit.can_move = false;
+            var enemy = move.occupied.get(dest.toString());
+            if (enemy.lives == 1)
+            {
+                move.removeAllUnits(enemy.owner_id);
+                move.occupied.set(dest.toString(), unit);
+                move.checkGameOver();
+            }
+            else
+            {
+                var move = this.clone();
+                var unit = move.occupied.get(source.toString());
+                unit.can_move = false;
+                enemy.lives--;
+                move.occupied.set(penult.toString(), unit);
+                move.occupied.delete(source.toString());
+                move.action = {type: attack_bounce_to, from: source, to: penult, target: dest};
+            }
+        }
+        move.updateIncomes();
+        return move;
     }
 
     endTurnMove()
@@ -304,149 +350,153 @@ export class GameState
         return move;
     }
 
+    ///////////////////////////////////////////////
+    //              AI functions                 //
+    ///////////////////////////////////////////////
+
+    // return a list of all valid moves from a the current game state
+    getValidMoves()
+    {
+        var moves = [];
+
+        // skip to end turn if the player is dead
+        if (this.capitols[this.current_player].lives != 0)
+        {
+            // recruit moves
+            moves = moves.concat(this.recruitMoves());
+            // possible movements
+            this.occupied.forEach(function(unit, hex, map)
+            {
+                // this is repeated in the legality functions, but early exit is helpful for our AI
+                if (unit.owner_id != this.current_player || !unit.can_move)
+                    return;
+                hex = hexLib.Hex.prototype.fromString(hex);
+                var pf = new aStar(this.getValidMovementHexes(unit, hex), true);
+                hexLib.hex_spiral(hex, unit_movement.get(unit.type)+1).forEach(function(hc)
+                {
+                    // ditto above for the checks here
+                    if (!this.world_hex_set.has(hc.toString()))
+                        return;
+                    // attack move
+                    if (this.occupied.has(hc.toString()))
+                        moves = moves.concat(this.attackMoves(hex, hc, pf));
+                    // normal move
+                    else
+                        moves.push(this.movementMove(hex, hc, pf, this.current_player));
+                }, this);
+            }, this);
+        }
+        // end turn
+        moves.push(this.endTurnMove());
+        return moves;
+    }
+
+    // return all possible recruits from the current game state
     recruitMoves()
     {
         var moves = [];
         // possible recruits
         [sword, pike, cavalry, musket].forEach(function(type)
         {
-            var c = unit_cost.get(type);
-            if (c > this.treasuries[this.current_player])
-                return;
             hexLib.hex_ring(this.capitols[this.current_player].hex, 1).forEach(function(h)
             {
-                if (this.occupied.has(h.toString()))
-                    return;
-                var move = this.clone();
-                move.occupied.set(h.toString(), {type: type, owner_id: this.current_player, can_move: false});
-                move.treasuries[this.current_player] -= c;
-                move.upkeeps[this.current_player] += c;
-                move.action = {type: recruit_at, unit_type: type, owner_id: this.current_player, hex: h};
-                move.updateIncomes();
-                moves.push(move);
+                if (this.canRecruit(h, type, this.current_player))
+                    moves.push(this.recruitMove(h, type, this.current_player));
             }, this);
         }, this);
         return moves;
     }
 
-    movementMove(source, dest)
-    {
-        var move = this.clone();
-        move.action = {type: move_to, from: source, to: dest};
-        move.occupied.set(dest.toString(), move.occupied.get(source.toString()));
-        move.occupied.delete(source.toString());
-        move.occupied.get(dest.toString()).can_move = false;
-        move.updateIncomes();
-        return move;
-    }
-
+    // return all possible attack moves from the current game state
     attackMoves(source, dest, pf)
     {
         var moves = [];
         // possible attacks
-        if (this.occupied.get(dest.toString()).owner_id != this.current_player)
+        var path = pf.findPath(source, dest);
+        var result = combatResult(this.occupied.get(source.toString()).type, this.occupied.get(dest.toString()).type);
+        
+        var penults = hexLib.hex_ring(dest, 1);
+        for (var i=0; i<penults.length; i++)
         {
-            var result = combatResult(this.occupied.get(source.toString()), this.occupied.get(dest.toString()));
-            if (result == victory)
+            var penult = penults[i];
+            if this.canAttackFromDirection(source, dest, penult, pf, this.current_player)
             {
-                var move = this.movementMove(source, dest);
-                var enemy = move.occupied.get(dest.toString());
-                move.upkeeps[enemy.owner_id] -= unit_cost.get(enemy.type);
-                move.action = {type: attack_to, from: source, to: dest};
-                move.updateIncomes();
-                moves.push(move);
-            }
-            else if (result == defeat)
-            {
-                var move = this.clone();
-                var unit = move.occupied.get(source.toString());
-                var enemy = move.occupied.get(dest.toString());
-                move.occupied.delete(source.toString());
-                move.action = {type: attack_to, from: source, to: dest};
-                move.upkeeps[unit.owner_id] -= unit_cost.get(unit.type);
-                move.occupied.get(dest.toString()).can_move = false;
-                move.updateIncomes();
-                moves.push(move);
-            }
-            else if (result == draw)
-            {
-                hexLib.hex_ring(dest, 1).forEach(function(h)
-                {
-                    var path = pf.findPath(source, h);;
-                    move = this.clone();
-                    var unit = move.occupied.get(source.toString());
-                    if (path.length > unit.move_range)
-                        return;
-                    var enemy = move.occupied.get(dest.toString());
-                    move.occupied.set(h.toString(), unit);
-                    move.occupied.delete(source.toString());
-                    unit.can_move = false;
-                    enemy.can_move = false;
-                    move.action = {type: attack_bounce_to, from: source, to: h, target: dest};
-                    move.updateIncomes();
-                    moves.push(move);
-                }, this);
-            }
-            else // attack cap
-            {
-                var move = this.clone();
-                var unit = move.occupied.get(source.toString());
-                unit.can_move = false;
-                var enemy = move.occupied.get(dest.toString());
-                if (enemy.lives == 1)
-                {
-                    move.removeAllUnits(enemy.owner_id);
-                    move.occupied.set(dest.toString(), unit);
-                    move.checkGameOver();
-                    move.updateIncomes();
-                    moves.push(move);
-                }
-                else
-                {
-                    hexLib.hex_ring(dest, 1).forEach(function(h)
-                    {
-                        var move = this.clone();
-                        var unit = move.occupied.get(source.toString());
-                        unit.can_move = false;
-                        var path = pf.findPath(source, h);;
-                        if (path.length > unit.move_range)
-                            return;
-                        enemy.lives--;
-                        move.occupied.set(h.toString(), unit);
-                        move.occupied.delete(source.toString());
-                        move.action = {type: attack_bounce_to, from: source, to: h, target: dest};
-                        move.updateIncomes();
-                        moves.push(move);
-                    }, this);
-                }
+                moves.push(this.attackMove(source, dest, penult, pf, this.current_player));
+                // these cases there's no point considering all attack directions, break as soon as we find a valid one
+                // last case is when killing a cap
+                if (result == victory || result == defeat ||
+                   (result == attack_capitol && this.occupied.get(dest.toString()).lives == 1))
+                    break;
             }
         }
-        else // can't move into allied occupied hex
-            return [];
         return moves;
     }
 
-    // play a game from the current state to a gameOver state, returning the result for the given player
-    simulate(player_id)
+    // give a value between 0 and 1 for the current game state for the given player
+    evaluation(player_id)
     {
-        var state = this;
-        var max_depth = 5;
-        var depth = 0;
-        while ((!state.gameOver) && depth < max_depth)
+        if (player_id >= this.num_players)
+            throw(BadPlayerId);
+        // more money is good
+        function income_score(state, player_id)
         {
-            prev = moves;
-            var moves = state.getValidMoves();
-
-            prev_state = state;
-            state = heuristic(moves, state.current_player);
-
-            if (state.action.type == end_turn)
-                depth++;
+            return state.incomes[player_id];
         }
-        if (!state.gameOver)
-            return evaluation(state, player_id);
-        if (state.winner == player_id)
-            return 1;
-        return -1;
+
+        // having more troops is good
+        function troop_score(state, player_id)
+        {
+            var score = 0;
+            state.occupied.forEach(function(unit, hex, map)
+            {
+                if (unit.owner_id == player_id)
+                    score++;
+                else
+                    score--;
+            });
+            return score;
+        }
+
+        // taking away opponents' lives is good
+        // having more lives than opponents' is better
+        function life_score(state, player_id)
+        {
+            var score = 0;
+            for (var i=0; i<state.num_players; i++)
+            {
+                if (i == player_id) 
+                    score += 3*state.capitols[i].lives;
+                else
+                    score -= state.capitols[i].lives;
+            }
+            return score;
+        }
+
+        // score on various metrics relative to the strongest player in those fields
+        var total_score = 0;
+        var metrics = [income_score, troop_score, life_score]
+        metrics.forEach(function(score)
+        {
+            var highest_score = score(this, 0);
+            var best_player = 0;
+            var scores = [highest_score];
+            for (var i=1; i<this.num_players; i++)
+            {
+                var s = score(this, i);
+                scores.push(s);
+                if (s > highest_score)
+                {
+                    highest_score = s;
+                    best_player = i;
+                }
+            }
+            // full points for being the best
+            if (best_player == player_id)
+                total_score += 1/metrics.length;
+            // otherwise normalise to the better player
+            else
+                total_score += scores[player_id]/highest_score/metrics.length;
+        });
+        return total_score;
     }
 }

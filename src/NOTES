@@ -20,7 +20,7 @@ Have non-contextual commands, e.g. end turn while recruit menu is open, cancel c
 
 disable input while AI takes turn
 
-Have MCTS kept between rounds and advanced, so it may improve as the game goes on
+sort AI moves so all recruits happen at the end and only the last is delayed
 
 improve heuristic
 
