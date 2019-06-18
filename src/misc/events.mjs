@@ -22,13 +22,12 @@ export const end_turn = "end_turn";
 export const end_round = "end_round";
 
 export const territory_change = "territory_change";
-export const recalc_territories = "recalc_territories";
 export const player_bankrupt = "player_bankrupt"; // player_id
 export const shake_treasury = "shake_treasury"; // player_id
-export const unit_death = "unit_death"; // unit
+export const unit_death = "unit_death"; // hex
 
 // registry keys
-export const current_player = "current_player";
+export const game_state = "game_state";
 export const is_placing_unit = "is_placing_unit";
 export const unit_to_place = "unit_to_place";
 export const can_gen = "can_gen";

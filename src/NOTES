@@ -24,7 +24,7 @@ sort AI moves so all recruits happen at the end and only the last is delayed
 
 improve heuristic
 
-consider C++ lib
+Seed for PRNG world gen
 
 --------------------
 

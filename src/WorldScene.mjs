@@ -8,21 +8,27 @@ import * as events from "./misc/events.mjs";
 import {Unit} from "./Unit.mjs";
 import {Capitol} from "./Capitol.mjs";
 import {HexCursor} from "./HexCursor.mjs";
-import {generateWorld, placeCapitols, determineTerritories} from "./world_functions.mjs";
 
 export class WorldScene extends Phaser.Scene
 {
 
+    gameState()
+    {
+        return this.registry.get(events.game_state);
+    }
+
+    events()
+    {
+        return this.registry.get(events.events);
+    }
+
     constructor()
     {
         super("world");
-        this.camera_controls;
-        this.occupied = new Map();
-        this.hex_to_sprite = new Map();
-        this.pathfinder;
 
-        this.world;
-        this.world_string_set;
+        this.camera_controls;
+        this.hex_to_sprite = new Map();
+
         this.territories;
         this.closest_units;
         this.capitol_positions;
@@ -133,49 +139,28 @@ export class WorldScene extends Phaser.Scene
 
         this.camera_controls = new Phaser.Cameras.Controls.FixedKeyControl(controlConfig);
 
-        this.events.on(events.recalc_territories, function()
+        this.events.on(events.territory_change, function()
         {
-            [this.territories, this.closest_units] = determineTerritories(this.world, this.getPlayerPositions(), this.pathfinder);
+            [this.territories, this.closest_units] = this.gameState().determineTerritories();
             this.colourTerritories(false);
-            this.events.emit(events.territory_change);
+            // set econ data in registry for UIScene
+            for (var i=0; i<this.gameState().num_players; i++)
+                this.registry.set("income"+i.toString(), this.gameState().incomes[i]);
         }, this);
 
         this.createMap();
         this.initUI();
-
-        this.input.keyboard.on('keydown-T', function (event)
-        {
-            this.events.emit(events.player_bankrupt, 0);
-        },this);
     }
 
     createMap()
     {
-        const world_size = 10.0;
-        const num_players = world_size/5;
-        this.world = [];
         this.hex_to_sprite.clear()
-        this.occupied.clear();
 
         this.camera_controls.stop();
 
-        while (true)
-        {
-            while (this.world.length < num_players*world_size*2)
-                this.world = generateWorld(world_size);
-            this.world_string_set = new Set( this.world.map(x => x.toString()) );
-
-            // spawn starting locations and determine begining territories
-            [this.capitol_positions, this.territories, this.closest_units, this.pathfinder] = placeCapitols(this.world, this.world_string_set, world_size, num_players);
-            // if placeCapitols came back with real data we're done genning
-            if (this.capitol_positions.length > 0)
-                break;
-            this.world = [];
-        }
-
         var i = 0;
-        var depth = -this.world.length;
-        this.world.forEach(function(h)
+        var depth = -this.gameState().world.length;
+        this.gameState().world.forEach(function(h)
         {
             var p = hexLib.hex_to_pixel(hex_layout, h);
             var img = this.add.image(p.x, p.y, 'hex');
@@ -201,17 +186,17 @@ export class WorldScene extends Phaser.Scene
         var available_colours = player_colours.slice(); // clone
         available_colours = shuffle(available_colours);
         this.player_colours = [];
-        for (var i = 0; i < num_players; i++) 
+        for (var i=0; i<this.gameState().num_players; i++) 
         {
             var colour = available_colours.pop();
             this.player_colours.push(colour);
         }
 
+        var call_params = [];
         // pan-zoom to each capitol
-        // store player capitol hex and colour
-        var i = 0;
-        this.capitol_positions.forEach(function(h)
+        for (var i=0; i<this.gameState().num_players; i++) 
         {
+            var h = this.gameState().capitols[i].hex;
             // place capitol, animate surroundings
             var p = hexLib.hex_to_pixel(hex_layout, h);
 
@@ -221,15 +206,12 @@ export class WorldScene extends Phaser.Scene
             cap.scaleY = 0;
 
             cap.setPosition(p.x, p.y);
-            cap.depth = this.world.length + 1;
+            cap.depth = this.gameState().world.length + 1;
 
-            this.occupied.set(h.toString(), cap);
-
-            this.time.delayedCall(300+this.world.length+1000*i, function()
+            this.time.delayedCall(300+this.gameState().world.length+1000*i, function(cap)
             {
-
                 var cam = this.cameras.main;
-                cam.pan(p.x, p.y, 333, "Expo");
+                cam.pan(cap.x, cap.y, 333, "Expo");
                 cam.zoomTo(3, 400, "Cubic");
                 this.time.delayedCall(400, function()
                 {
@@ -245,19 +227,21 @@ export class WorldScene extends Phaser.Scene
                     duration: 1000,
                     delay: 0
                 });
-            }, [], this);
-            i++;
-        }, this);
+            }, [cap], this);
+        };
 
+        [this.territories, this.closest_units] = this.gameState().determineTerritories();
         var max_d = this.colourTerritories();
 
+        var num_players = this.gameState().num_players;
+
         // pan-zoom to centre, enable camera_controls and UI
-        this.time.delayedCall(300+this.world.length+1000*(num_players-1) + max_d*100, function()
+        this.time.delayedCall(300+this.gameState().world.length+1000*(num_players-1) + max_d*100, function()
         {
             var cam = this.cameras.main;
             cam.pan(500, 500, 1000, "Linear");
         }, [], this);
-        this.time.delayedCall(300+this.world.length+1000*(num_players-1) + max_d*100 + 1000, function()
+        this.time.delayedCall(300+this.gameState().world.length+1000*(num_players-1) + max_d*100 + 1000, function()
         {
             this.camera_controls.start();
             this.registry.set(events.can_gen, true);
@@ -278,7 +262,7 @@ export class WorldScene extends Phaser.Scene
         {
             var p = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
             var h = hexLib.hex_round(hexLib.pixel_to_hex(hex_layout, p));
-            if (this.world_string_set.has(h.toString()))
+            if (this.gameState().world_hex_set.has(h.toString()))
             {
                 this.events.emit(events.hexover, h);
                 if ( (!this.registry.get(events.menu_open) || this.registry.get(events.cursor_outside_menu)) && this.registry.get(events.can_gen) )
@@ -294,7 +278,7 @@ export class WorldScene extends Phaser.Scene
         {
             var p = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
             var h = hexLib.hex_round(hexLib.pixel_to_hex(hex_layout, p));
-            if (this.world_string_set.has(h.toString()))
+            if (this.gameState().world_hex_set.has(h.toString()))
                 this.events.emit(events.hexdown, h);
         },this);
 
@@ -302,24 +286,12 @@ export class WorldScene extends Phaser.Scene
         this.events.on(events.hexdown, function (hex) 
         {
             this.events.emit(events.close_menu);
-            if (this.occupied.has(hex.toString()))
+            if (this.gameState().occupied.has(hex.toString()))
             {
-                var unit = this.occupied.get(hex.toString());
+                var unit = this.gameState().occupied.get(hex.toString());
                 unit.handlePointerDown();
             }
         }, this);
-    }
-
-    getPlayerPositions()
-    {
-        var players = [];
-        for (var i=0; i < this.player_colours.length; i++) 
-            players.push([]);
-        this.occupied.forEach(function(unit, hex, map)
-        {
-            players[unit.owner_id].push(hexLib.Hex.prototype.fromString(hex));
-        });
-        return players;
     }
 
     colourTerritories(initial_delay=true)
@@ -330,14 +302,14 @@ export class WorldScene extends Phaser.Scene
         this.hex_to_sprite.forEach(function(hex, string, map)
         {
             var owner_id = this.territories.get(string);
-            var d = this.pathfinder.findPath(hexLib.Hex.prototype.fromString(string), this.closest_units.get(string)).length;
+            var d = this.gameState().world_pathfinder.findPath(hexLib.fromString(string), this.closest_units.get(string)).length;
 
             max_d = d > max_d ? d : max_d;
             var col1 = hex.isTinted ? hex.tint : white;
             var col2 = owner_id != -1 ? this.player_colours[owner_id] : white;
             var initdelay = 0;
             if (initial_delay)
-                initdelay = 300+this.world.length+1000*owner_id;
+                initdelay = 300+this.gameState().world.length+1000*owner_id;
             var tween = this.tweens.addCounter({
                 from: 0,
                 to: 1,

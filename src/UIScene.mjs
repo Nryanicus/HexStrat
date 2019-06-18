@@ -5,6 +5,16 @@ import {unit_cost, white, red} from "./misc/constants.mjs";
 export class UIScene extends Phaser.Scene
 {
 
+    gameState()
+    {
+        return this.registry.get(events.game_state);
+    }
+
+    events()
+    {
+        return this.registry.get(events.events);
+    }
+
     constructor()
     {
         super("ui");

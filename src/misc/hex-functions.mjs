@@ -15,13 +15,15 @@ export class Hex{
         this.r = r;
         this.s = s;
     }
+
+    toString()
+    {
+        return "Hex(" + this.q + ',' + this.r + ',' + this.s + ")";
+    }
 }
 
-Hex.prototype.toString = function hexToString() {
-  return "Hex(" + this.q + ',' + this.r + ',' + this.s + ")";
-}
 
-Hex.prototype.fromString = function hexFromString(s) 
+export function fromString(s) 
 {
     var str = s.slice(4,-1);
     var arr = str.split(",");

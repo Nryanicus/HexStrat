@@ -6,21 +6,39 @@ import {Unit} from "./Unit.mjs";
 
 export class Capitol extends Phaser.GameObjects.Container 
 {
-    constructor (scene, x, y, hex, colour, owner_id)
+    gameState()
+    {
+        return this.registry.get(events.game_state);
+    }
+
+    hex()
+    {
+        return this.gameState().capitols[this.owner_id].hex;
+    }
+
+    lives()
+    {
+        return this.gameState().capitols[this.owner_id].lives;
+    }
+
+    events()
+    {
+        return this.scene.events;
+    }
+
+    constructor (scene, x, y, colour, owner_id)
     {
         super(scene, x, y);
-        this.scene = scene;
-        this.hex = hex;
-        this.colour = colour;
+
+        // all game logic is looked up through this key
         this.owner_id = owner_id;
+
+        this.scene = scene;
+        this.colour = colour;
         this.setPosition(x, y);
         this.depth = 1;
-        this.type = capitol;
-        this.lives = 3;
         this.pixels = new Map();
         this.flats = [];
-
-        this.can_move = false; // duck typing for things that scan occupied hexes
 
         // deep copy
         this.pixels_columns = [];
@@ -87,11 +105,11 @@ export class Capitol extends Phaser.GameObjects.Container
         {
             img.on('pointerdown', function(pointer, localx, localy, event)
             {
-                //DEBUG: let's recruit some enemy units
                 if (this.owner_id == 0)
-                    this.scene.events.emit(events.recruit_attempt, unit_map.get(img), this.owner_id);
+                    this.events().emit(events.recruit_attempt, unit_map.get(img));
+                //DEBUG: let's recruit some enemy units
                 else
-                    this.scene.events.emit(events.recruit, unit_map.get(img), this.owner_id);
+                    this.events().emit(events.recruit, unit_map.get(img));
                 event.stopPropagation();
             }, this);
 
@@ -102,13 +120,13 @@ export class Capitol extends Phaser.GameObjects.Container
                     g.setVisible(g == glow_map.get(img));
                 });
                 this.scene.registry.set(events.cursor_outside_menu, false);
-                this.scene.events.emit(events.hide_hex_cursor);
+                this.events().emit(events.hide_hex_cursor);
             }, this);
             img.on('pointerout', function()
             {
                 glow_map.get(img).setVisible(false);
                 this.scene.registry.set(events.cursor_outside_menu, false);
-                this.scene.events.emit(events.hide_hex_cursor);
+                this.events().emit(events.hide_hex_cursor);
             }, this);
 
         }, this);
@@ -117,19 +135,19 @@ export class Capitol extends Phaser.GameObjects.Container
         this.menu.on('pointerover', function()
         {
             this.scene.registry.set(events.cursor_outside_menu, false);
-            this.scene.events.emit(events.hide_hex_cursor);
+            this.events().emit(events.hide_hex_cursor);
         }, this);
         this.menu.on('pointerout', function()
         {
             this.scene.registry.set(events.cursor_outside_menu, true);
-            this.scene.events.emit(events.show_hex_cursor);
+            this.events().emit(events.show_hex_cursor);
         }, this);
 
-        this.scene.events.on(events.recruit, this.handleRecruit, this);
+        this.events().on(events.recruit, this.handleRecruit, this);
 
-        this.scene.events.on(events.cancel_recruitment, this.handleCancelRecruit, this);
+        this.events().on(events.cancel_recruitment, this.handleCancelRecruit, this);
 
-        this.scene.events.on("close_menu", this.closeMenu, this);
+        this.events().on("close_menu", this.closeMenu, this);
     }
 
     handleCancelRecruit(player_id, unit_type)
@@ -157,7 +175,7 @@ export class Capitol extends Phaser.GameObjects.Container
         this.scene.registry.set(events.is_placing_unit, true);
         var utp = this.scene.add.existing(new Unit(this.scene, p.x, p.y-2, type, h, this.owner_id, this.scene.occupied, this.scene.world_string_set));
         this.scene.registry.set(events.unit_to_place, utp);
-        this.scene.events.emit(events.recruit_cost, utp.type, player_id)
+        this.events().emit(events.recruit_cost, utp.type, player_id)
 
         hexLib.hex_ring(this.hex, 1).forEach(function(h)
         {
@@ -176,7 +194,7 @@ export class Capitol extends Phaser.GameObjects.Container
                 this.scene.occupied.set(h.toString(), utp);
                 this.scene.registry.set(events.is_placing_unit, false);
                 this.scene.registry.set(events.unit_to_place, null);
-                this.scene.events.emit(events.recalc_territories);
+                this.events().emit(events.recalc_territories);
                 this.flats.map(f => f.destroy());
                 this.flats = [];
                 this.scene.tweens.add({
@@ -214,7 +232,7 @@ export class Capitol extends Phaser.GameObjects.Container
     {
         this.menu.setVisible(false);
         this.menu.setActive(false);
-        this.scene.events.emit(events.show_hex_cursor);
+        this.events().emit(events.show_hex_cursor);
         this.scene.registry.set(events.menu_open, false);
     } 
 
@@ -234,7 +252,7 @@ export class Capitol extends Phaser.GameObjects.Container
             if (this.scene.registry.get(events.unit_to_place).owner_id == this.owner_id)
             {
                 var utp = this.scene.registry.get(events.unit_to_place);
-                this.scene.events.emit(events.cancel_recruitment, this.owner_id, utp.type);
+                this.events().emit(events.cancel_recruitment, this.owner_id, utp.type);
             }
             else
                 return;
@@ -310,14 +328,13 @@ export class Capitol extends Phaser.GameObjects.Container
         }
         this.scene.time.delayedCall(max_duration, function()
         {
-            this.lives--;
-            if (this.lives == 0)
+            if (this.gameState().capitols[this.owner_id].lives == 0)
             {
-                this.scene.events.emit(events.player_bankrupt, this.owner_id);
+                this.events().emit(events.player_bankrupt, this.owner_id);
                 // to cancel
-                this.scene.events.off("close_menu", this.closeMenu, this);
-                this.scene.events.off(events.recruit, this.handleRecruit, this);
-                this.scene.events.off(events.cancel_recruitment, this.handleCancelRecruit, this);
+                this.events().off("close_menu", this.closeMenu, this);
+                this.events().off(events.recruit, this.handleRecruit, this);
+                this.events().off(events.cancel_recruitment, this.handleCancelRecruit, this);
                 // TODO more comprehensive removal from game system. e.g. AI
                 this.destroy();
             }

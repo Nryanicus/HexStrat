@@ -2,7 +2,8 @@ import * as hexLib from "./misc/hex-functions.mjs";
 import {victory, defeat, draw, attack_capitol, sword, pike, cavalry, musket, capitol, unit_cost, unit_movement} from "./misc/constants.mjs";
 import {aStar} from "./misc/aStar.mjs";
 import {shuffle} from "./misc/utilities.mjs";
-import {determineTerritories} from "./world_functions.mjs";
+import * as WorldFunctions from "./world_functions.mjs";
+// import {generateWorld, placeCapitols, determineTerritories} from "./world_functions.mjs";
 
 // exceptions
 export const BadTransistion = "BadTransistion";
@@ -59,6 +60,56 @@ export function combatResult(a, b)
     throw(BogusUnitType);
 }
 
+// generate a new game with a new world map
+// args = {num_players, seed, world_size, starting_income}
+export function generateWorld(args={num_players: null, seed: null, world_size: null, starting_income: null})
+{
+    var world_size = (args.world_size == null) ? 10.0 : args.world_size;
+    var num_players = (args.num_players == null) ? world_size/5 : args.num_players;
+    var starting_treasury = (args.starting_treasury == null) ? 21 : args.starting_treasury;
+    // TODO var seed = (args.seed == null) ? world_size/5 : arg.seed;
+    
+    // values to be populated below
+    var world;
+    var world_string_set;
+    var capitol_positions, territories, closest_units, pathfinder;
+
+    // generating valid worlds is nondeterministic, but doesn't tend to not happen too often
+    while (true)
+    {
+        world = [];
+        // ensure we have enough hexes to place the caps legally
+        while (world.length < num_players*world_size*2)
+            world = WorldFunctions.generateWorld(world_size);
+        world_string_set = new Set( world.map(x => x.toString()) );
+
+        // spawn starting locations and determine begining territories
+        [capitol_positions, territories, closest_units, pathfinder] = WorldFunctions.placeCapitols(world, world_string_set, world_size, num_players);
+        // if placeCapitols came back with real data we're done genning
+        if (capitol_positions.length > 0)
+            break;
+    }
+
+    // record player capitols
+    var capitols = []
+    var treasuries = []
+    var upkeeps = []
+    var occupied = new Map();
+    for (var i=0; i<capitol_positions.length; i++)
+    {
+        var h = capitol_positions[i];
+        occupied.set(h.toString(), {type: capitol, owner_id: i, can_move: false});
+        capitols.push({hex: h, lives: 3});
+        treasuries.push(starting_treasury);
+        upkeeps.push(0);
+    }
+
+    var gs = new GameState(0, world, world_string_set, pathfinder, occupied, capitols, treasuries, [], []);
+    gs.updateIncomes();
+
+    return gs;
+}
+
 export class GameState
 {
     constructor(current_player, world, world_hex_set, pathfinder, occupied, capitols, treasuries, incomes, upkeeps)
@@ -108,18 +159,24 @@ export class GameState
         return new GameState(this.current_player, this.world, this.world_hex_set, this.world_pathfinder, occupied, capitols, treasuries, incomes, upkeeps);
     }
 
-    // set incomes for current unit positions
-    updateIncomes()
+    // wrap the world function with our params
+    determineTerritories()
     {
         var players = [];
         for (var i=0; i < this.num_players; i++) 
             players.push([]);
         this.occupied.forEach(function(unit, hex, map)
         {
-            players[unit.owner_id].push(hexLib.Hex.prototype.fromString(hex));
+            players[unit.owner_id].push(hexLib.fromString(hex));
         });
+        return WorldFunctions.determineTerritories(this.world, players, this.world_pathfinder);
+    }
+
+    // set incomes for current unit positions
+    updateIncomes()
+    {
         var t, c;
-        [t ,c] = determineTerritories(this.world, players, this.world_pathfinder);
+        [t, c] = this.determineTerritories();
         this.incomes = [];
         for (var i = 0; i < this.num_players; i++)
             this.incomes.push(0);
@@ -370,7 +427,7 @@ export class GameState
                 // this is repeated in the legality functions, but early exit is helpful for our AI
                 if (unit.owner_id != this.current_player || !unit.can_move)
                     return;
-                hex = hexLib.Hex.prototype.fromString(hex);
+                hex = hexLib.fromString(hex);
                 var pf = new aStar(this.getValidMovementHexes(unit, hex), true);
                 hexLib.hex_spiral(hex, unit_movement.get(unit.type)+1).forEach(function(hc)
                 {
@@ -419,7 +476,7 @@ export class GameState
         for (var i=0; i<penults.length; i++)
         {
             var penult = penults[i];
-            if this.canAttackFromDirection(source, dest, penult, pf, this.current_player)
+            if (this.canAttackFromDirection(source, dest, penult, pf, this.current_player))
             {
                 moves.push(this.attackMove(source, dest, penult, pf, this.current_player));
                 // these cases there's no point considering all attack directions, break as soon as we find a valid one
