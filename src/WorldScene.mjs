@@ -12,19 +12,19 @@ import {HexCursor} from "./HexCursor.mjs";
 export class WorldScene extends Phaser.Scene
 {
 
-    gameState()
+    getGameState()
     {
         return this.registry.get(events.game_state);
     }
 
-    events()
+    getEvents()
     {
         return this.registry.get(events.events);
     }
 
     constructor()
     {
-        super("world");
+        super({key:"world", plugins:["Loader", "TweenManager", "InputPlugin", "Clock"]});
 
         this.camera_controls;
         this.hex_to_sprite = new Map();
@@ -33,6 +33,8 @@ export class WorldScene extends Phaser.Scene
         this.closest_units;
         this.capitol_positions;
         this.player_colours;
+
+        this.hex_to_unit = new Map();
     }
 
     preload()
@@ -136,17 +138,7 @@ export class WorldScene extends Phaser.Scene
             down: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
             speed: 0.5
         };
-
         this.camera_controls = new Phaser.Cameras.Controls.FixedKeyControl(controlConfig);
-
-        this.events.on(events.territory_change, function()
-        {
-            [this.territories, this.closest_units] = this.gameState().determineTerritories();
-            this.colourTerritories(false);
-            // set econ data in registry for UIScene
-            for (var i=0; i<this.gameState().num_players; i++)
-                this.registry.set("income"+i.toString(), this.gameState().incomes[i]);
-        }, this);
 
         this.createMap();
         this.initUI();
@@ -159,8 +151,8 @@ export class WorldScene extends Phaser.Scene
         this.camera_controls.stop();
 
         var i = 0;
-        var depth = -this.gameState().world.length;
-        this.gameState().world.forEach(function(h)
+        var depth = -this.getGameState().world.length;
+        this.getGameState().world.forEach(function(h)
         {
             var p = hexLib.hex_to_pixel(hex_layout, h);
             var img = this.add.image(p.x, p.y, 'hex');
@@ -186,7 +178,7 @@ export class WorldScene extends Phaser.Scene
         var available_colours = player_colours.slice(); // clone
         available_colours = shuffle(available_colours);
         this.player_colours = [];
-        for (var i=0; i<this.gameState().num_players; i++) 
+        for (var i=0; i<this.getGameState().num_players; i++) 
         {
             var colour = available_colours.pop();
             this.player_colours.push(colour);
@@ -194,21 +186,23 @@ export class WorldScene extends Phaser.Scene
 
         var call_params = [];
         // pan-zoom to each capitol
-        for (var i=0; i<this.gameState().num_players; i++) 
+        for (var i=0; i<this.getGameState().num_players; i++) 
         {
-            var h = this.gameState().capitols[i].hex;
+            var h = this.getGameState().capitols[i].hex;
             // place capitol, animate surroundings
             var p = hexLib.hex_to_pixel(hex_layout, h);
 
-            var cap = new Capitol(this, p.x, p.y, h, this.player_colours[i], i);
+            var cap = new Capitol(this, p.x, p.y, this.player_colours[i], i);
             this.add.existing(cap);
             cap.scaleX = 0;
             cap.scaleY = 0;
 
             cap.setPosition(p.x, p.y);
-            cap.depth = this.gameState().world.length + 1;
+            cap.depth = this.getGameState().world.length + 1;
 
-            this.time.delayedCall(300+this.gameState().world.length+1000*i, function(cap)
+            this.hex_to_unit.set(h.toString(), cap);
+
+            this.time.delayedCall(300+this.getGameState().world.length+1000*i, function(cap)
             {
                 var cam = this.cameras.main;
                 cam.pan(cap.x, cap.y, 333, "Expo");
@@ -230,24 +224,22 @@ export class WorldScene extends Phaser.Scene
             }, [cap], this);
         };
 
-        [this.territories, this.closest_units] = this.gameState().determineTerritories();
         var max_d = this.colourTerritories();
 
-        var num_players = this.gameState().num_players;
+        var num_players = this.getGameState().num_players;
 
         // pan-zoom to centre, enable camera_controls and UI
-        this.time.delayedCall(300+this.gameState().world.length+1000*(num_players-1) + max_d*100, function()
+        this.time.delayedCall(300+this.getGameState().world.length+1000*(num_players-1) + max_d*100, function()
         {
             var cam = this.cameras.main;
             cam.pan(500, 500, 1000, "Linear");
         }, [], this);
-        this.time.delayedCall(300+this.gameState().world.length+1000*(num_players-1) + max_d*100 + 1000, function()
+        this.time.delayedCall(300+this.getGameState().world.length+1000*(num_players-1) + max_d*100 + 1000, function()
         {
             this.camera_controls.start();
             this.registry.set(events.can_gen, true);
-            this.events.emit(events.show_hex_cursor);
-            this.events.emit(events.territory_change, true);
-            this.events.emit(events.show_ui, true);
+            this.getEvents().emit(events.show_hex_cursor);
+            this.getEvents().emit(events.show_ui, true);
         }, [], this);
     }
 
@@ -262,14 +254,14 @@ export class WorldScene extends Phaser.Scene
         {
             var p = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
             var h = hexLib.hex_round(hexLib.pixel_to_hex(hex_layout, p));
-            if (this.gameState().world_hex_set.has(h.toString()))
+            if (this.getGameState().world_hex_set.has(h.toString()))
             {
-                this.events.emit(events.hexover, h);
+                this.getEvents().emit(events.hexover, h);
                 if ( (!this.registry.get(events.menu_open) || this.registry.get(events.cursor_outside_menu)) && this.registry.get(events.can_gen) )
-                    this.events.emit(events.show_hex_cursor, h);
+                    this.getEvents().emit(events.show_hex_cursor, h);
             }
             else
-                this.events.emit(events.hide_hex_cursor, h);
+                this.getEvents().emit(events.hide_hex_cursor, h);
         }, this);
 
         // IMPORTANT: if we don't want this to trigger have the event listeners on top stopPropagation()
@@ -278,38 +270,48 @@ export class WorldScene extends Phaser.Scene
         {
             var p = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
             var h = hexLib.hex_round(hexLib.pixel_to_hex(hex_layout, p));
-            if (this.gameState().world_hex_set.has(h.toString()))
-                this.events.emit(events.hexdown, h);
+            if (this.getGameState().world_hex_set.has(h.toString()))
+                this.getEvents().emit(events.hexdown, h);
         },this);
 
         // map interaction
-        this.events.on(events.hexdown, function (hex) 
+        this.getEvents().on(events.hexdown, function (hex) 
         {
-            this.events.emit(events.close_menu);
-            if (this.gameState().occupied.has(hex.toString()))
+            this.getEvents().emit(events.close_menu);
+            if (this.hex_to_unit.has(hex.toString()))
             {
-                var unit = this.gameState().occupied.get(hex.toString());
+                console.assert(this.getGameState().occupied.has(hex.toString()));
+                var unit = this.hex_to_unit.get(hex.toString());
                 unit.handlePointerDown();
             }
         }, this);
+
+        // recolour map when asked to
+        this.getEvents().on(events.territory_change, function()
+        {
+            this.colourTerritories(false);
+        }, this);
+
     }
 
     colourTerritories(initial_delay=true)
     {
+        var territories, closest_units;
+        [territories, closest_units] = this.getGameState().determineTerritories();
         // colour all environs, in radial fashion
         var max_d = 0;
         var tween_map = new Map();
         this.hex_to_sprite.forEach(function(hex, string, map)
         {
-            var owner_id = this.territories.get(string);
-            var d = this.gameState().world_pathfinder.findPath(hexLib.fromString(string), this.closest_units.get(string)).length;
+            var owner_id = territories.get(string);
+            var d = this.getGameState().world_pathfinder.findPath(hexLib.fromString(string), closest_units.get(string)).length;
 
             max_d = d > max_d ? d : max_d;
             var col1 = hex.isTinted ? hex.tint : white;
             var col2 = owner_id != -1 ? this.player_colours[owner_id] : white;
             var initdelay = 0;
             if (initial_delay)
-                initdelay = 300+this.gameState().world.length+1000*owner_id;
+                initdelay = 300+this.getGameState().world.length+1000*owner_id;
             var tween = this.tweens.addCounter({
                 from: 0,
                 to: 1,

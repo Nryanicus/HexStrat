@@ -10,10 +10,9 @@ import * as hexLib from "./misc/hex-functions.mjs";
 
 export class MasterScene extends Phaser.Scene
 {
-
     constructor()
     {
-        super("master");
+        super({key:"master", plugins:["InputPlugin"]});
     }
 
     create()
@@ -21,44 +20,86 @@ export class MasterScene extends Phaser.Scene
         this.currentPlayer = 0;
         this.numPlayers = 2;
         this.aiPlayers = [false, true];
-        
+
         this.registry.set(events.events, this.events);
 
         this.initNewWorld();
+        this.initEventHandlers();
     }
 
-    gameState()
+    initEventHandlers()
     {
-        return this.registry.get(events.game_state);
+        this.input.keyboard.on('keyup-ENTER', function (event) 
+        {
+            this.gameState = this.gameState.endTurnMove();
+            this.updateGameState();
+            this.events.emit(events.end_turn);
+        }, this);
+
+        // set econ values for UIScene to animate/display
+        this.events.on(events.territory_change, this.updateEconomyRegistry, this);
+
+        // animate here
+        this.events.on(events.recruit_placement, function(unit_type, player_id)
+        {
+            var cost = unit_cost.get(unit_type);
+            this.registry.set("treasury"+player_id.toString(), this.gameState.treasuries[player_id]-cost);
+            this.registry.set("upkeep"+player_id.toString(), this.gameState.upkeeps[player_id]+cost);
+        }, this);
+        this.events.on(events.recruit_cancel, function(unit_type, player_id)
+        {
+            var cost = unit_cost.get(unit_type);
+            this.registry.set("treasury"+player_id.toString(), this.gameState.treasuries[player_id]);
+            this.registry.set("upkeep"+player_id.toString(), this.gameState.upkeeps[player_id]);
+        }, this);
+
+
+        // interface for changing the game state
+        this.events.on(events.recruit_finalise, function(hex, unit_type, player_id)
+        {
+            this.gameState = this.gameState.recruitMove(hex, unit_type, player_id);
+            this.updateGameState();
+            this.updatePositions();
+        }, this);
     }
 
-    events()
+    updateGameState()
     {
-        return this.registry.get(events.events);
+        this.registry.set(events.game_state, this.gameState);
+    }
+
+    updatePositions()
+    {
+        this.events.emit(events.territory_change);
+    }
+
+    updateEconomyRegistry()
+    {
+        for (var player_id=0; player_id<this.numPlayers; player_id++)
+        {
+            this.registry.set("treasury"+player_id.toString(), this.gameState.treasuries[player_id]);
+            this.registry.set("upkeep"+player_id.toString(), this.gameState.upkeeps[player_id]);
+            this.registry.set("income"+player_id.toString(), this.gameState.incomes[player_id]);
+        }
     }
 
     initNewWorld()
     {
         this.events.removeAllListeners();
-        this.registry.set(events.game_state, GameLogic.generateWorld());
+        this.gameState = GameLogic.generateWorld();
+        this.updateGameState();
 
         this.registry.set(events.currentPlayer, 0)
         this.registry.set(events.can_gen, false)
         this.scene.remove('world');
         this.scene.remove('ui');
-        this.scene.add('world', WorldScene, true, {master: this});
+        this.scene.add('world', WorldScene, true);
         this.scene.moveBelow('world', "ui");
-        this.scene.add('ui', UIScene, true, {master: this});
+        this.scene.add('ui', UIScene, true);
         this.ui = this.scene.get('ui');
         this.world = this.scene.get('world');
 
-        for (var player_id=0; player_id<this.numPlayers; player_id++)
-        {
-            this.registry.set("treasury"+player_id.toString(), 21);
-            this.registry.set("upkeep"+player_id.toString(), 0);
-            this.registry.set("income"+player_id.toString(), 0);
-        }
-        this.world.events.emit(events.recalc_territories);
+        this.updateEconomyRegistry();
 
         this.aiThinking = false;
 

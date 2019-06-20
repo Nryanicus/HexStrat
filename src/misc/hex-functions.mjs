@@ -22,7 +22,6 @@ export class Hex{
     }
 }
 
-
 export function fromString(s) 
 {
     var str = s.slice(4,-1);

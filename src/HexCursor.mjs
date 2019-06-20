@@ -6,6 +6,16 @@ import * as events from "./misc/events.mjs";
 
 export class HexCursor extends Phaser.GameObjects.Image 
 {
+    gameState()
+    {
+        return this.scene.registry.get(events.game_state);
+    }
+
+    getEvents()
+    {
+        return this.scene.registry.get(events.events);
+    }
+
     constructor (scene, x, y)
     {
         super(scene, x, y);
@@ -30,24 +40,24 @@ export class HexCursor extends Phaser.GameObjects.Image
     
         // event listeners
 
-        this.scene.events.on(events.hexover, function (h) 
+        this.getEvents().on(events.hexover, function (h) 
         {
             var p = hexLib.hex_to_pixel(hex_layout, h);
             this.setPosition(p.x, p.y);
-            if (this.scene.registry.get(events.is_placing_unit) && !this.scene.occupied.has(h.toString()))
+            if (this.scene.registry.get(events.is_placing_unit) && !this.gameState().occupied.has(h.toString()))
                 this.scene.registry.get(events.unit_to_place).setPosition(p.x, p.y-2);
-            if (this.scene.registry.get(events.is_placing_unit) && this.scene.occupied.has(h.toString())
-                && this.scene.registry.get(events.unit_to_place).owner_id != this.scene.occupied.get(h.toString()).owner_id)
+            if (this.scene.registry.get(events.is_placing_unit) && this.gameState().occupied.has(h.toString())
+                && this.scene.registry.get(events.unit_to_place).owner_id != this.gameState().occupied.get(h.toString()).owner_id)
                 this.setTint(red);
             else
                 this.setTint(white);
         }, this);
 
-        this.scene.events.on(events.hide_hex_cursor, function()
+        this.getEvents().on(events.hide_hex_cursor, function()
         {
             this.setVisible(false);
         }, this);
-        this.scene.events.on(events.show_hex_cursor, function()
+        this.getEvents().on(events.show_hex_cursor, function()
         {
             this.setVisible(true);
         }, this);

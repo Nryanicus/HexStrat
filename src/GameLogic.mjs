@@ -104,7 +104,7 @@ export function generateWorld(args={num_players: null, seed: null, world_size: n
         upkeeps.push(0);
     }
 
-    var gs = new GameState(0, world, world_string_set, pathfinder, occupied, capitols, treasuries, [], []);
+    var gs = new GameState(0, world, world_string_set, pathfinder, occupied, capitols, treasuries, [], upkeeps);
     gs.updateIncomes();
 
     return gs;
@@ -253,6 +253,18 @@ export class GameState
     }
 
     ///////////////////////////////////////////////
+    //         UI convenience functions          //
+    ///////////////////////////////////////////////
+
+    canAfford(type, player_id)
+    {
+        if (player_id >= this.num_players)
+            throw(BadPlayerId);
+        var cost = unit_cost.get(type);
+        return cost <= this.treasuries[player_id];
+    }
+
+    ///////////////////////////////////////////////
     //        transistion legality checks        //
     ///////////////////////////////////////////////
 
@@ -261,12 +273,12 @@ export class GameState
         if (player_id >= this.num_players)
             throw(BadPlayerId);
         var cost = unit_cost.get(type);
-        var cap_ring = hexLib.hex_spiral(this.capitols[player_id].hex, 1);
+        var cap_ring = hexLib.hex_ring(this.capitols[player_id].hex, 1).map(h => h.toString());
         return  this.current_player == player_id &&
                 cost <= this.treasuries[player_id] &&
                 !this.occupied.has(hex.toString()) &&
                 this.world_hex_set.has(hex.toString()) &&
-                cap_ring.includes(hex);
+                cap_ring.includes(hex.toString());
     }
 
     canMove(source, dest, pf, player_id)
@@ -306,7 +318,10 @@ export class GameState
     recruitMove(hex, type, player_id)
     {
         if (!this.canRecruit(hex, type, player_id))
+        {
+            console.log(arguments);
             throw(BadTransistion);
+        }
         var move = this.clone();
         move.occupied.set(hex.toString(), {type: type, owner_id: player_id, can_move: false});
         var cost = unit_cost.get(type);
@@ -320,7 +335,10 @@ export class GameState
     movementMove(source, dest, pf, player_id)
     {
         if (!this.canMove(source, dest, pf, player_id))
+        {
+            console.log(arguments);
             throw(BadTransistion);
+        }
         var move = this.clone();
         var unit = move.occupied.get(source.toString());
         move.action = {type: move_to, from: source, to: dest};
@@ -334,7 +352,10 @@ export class GameState
     attackMove(source, dest, penult, pf, player_id)
     {
         if (!this.canAttackFromDirection(source, dest, penult, pf, player_id))
+        {
+            console.log(arguments);
             throw(BadTransistion);
+        }
 
         var move;
         var result = combatResult(this.occupied.get(source.toString()).type, this.occupied.get(dest.toString()).type);

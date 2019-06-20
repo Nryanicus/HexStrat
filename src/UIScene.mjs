@@ -1,23 +1,23 @@
 import * as events from "./misc/events.mjs";
 import {getRandomInt, getRandomFloat, padString, lerpColour} from "./misc/utilities.mjs";
-import {unit_cost, white, red} from "./misc/constants.mjs";
+import {unit_cost, white, red, sword, pike, cavalry, musket} from "./misc/constants.mjs";
 
 export class UIScene extends Phaser.Scene
 {
 
-    gameState()
+    getGameState()
     {
         return this.registry.get(events.game_state);
     }
 
-    events()
+    getEvents()
     {
         return this.registry.get(events.events);
     }
 
     constructor()
     {
-        super("ui");
+        super({key:"ui", plugins:["Loader", "TweenManager", "InputPlugin", "Clock"]});
         this.world;
         this.ui;
         this.height = 156;
@@ -160,11 +160,10 @@ export class UIScene extends Phaser.Scene
 
         this.ui.add([this.background, sword_glow, cavalry_glow, pike_glow, musket_glow, end_turn_glow, sword_select, cavalry_select, pike_select, musket_select, end_turn_select, this.treasury, this.income, this.upkeep]);
 
-        var select_map = new Map([[sword_select, events.recruit_sword],
-                                  [cavalry_select, events.recruit_cavalry],
-                                  [pike_select, events.recruit_pike],
-                                  [musket_select, events.recruit_musket],
-                                  [end_turn_select, events.end_turn]]);
+        var select_map = new Map([[sword_select, sword],
+                                  [cavalry_select, cavalry],
+                                  [pike_select, pike],
+                                  [musket_select, musket]]);
 
         var glow_map = new Map([[sword_select, sword_glow],
                                   [cavalry_select, cavalry_glow],
@@ -189,9 +188,14 @@ export class UIScene extends Phaser.Scene
             img.on("pointerdown", function()
             {
                 if (img != end_turn_select)
-                    this.world.events.emit(events.recruit_attempt, select_map.get(img), this.player_id);
+                {
+                    if (this.getGameState().canAfford(select_map.get(img), this.player_id))
+                        this.getEvents().emit(events.recruit_placement, select_map.get(img), this.player_id);
+                    else
+                        this.getEvents().emit(events.shake_treasury, this.player_id);
+                }
                 else
-                    this.world.events.emit(select_map.get(img));
+                    this.getEvents().emit(events.end_turn);
             }, this);
             img.on("pointerover", function()
             {
@@ -206,13 +210,31 @@ export class UIScene extends Phaser.Scene
 
     initEventHandlers()
     {
-        this.events.on(events.hide_ui, function()
+        this.getEvents().on(events.show_ui, function()
+        {
+            this.colour = this.world.player_colours[this.player_id];
+            this.background.setTint(this.colour);
+            this.treasury.setTint(this.colour);
+            this.income.setTint(this.colour);
+            this.upkeep.setTint(this.colour);
+            this.treasury.setText(padString(this.registry.get("treasury"+this.player_id.toString()).toString(), 10));
+            this.income.setText(padString(this.registry.get("income"+this.player_id.toString()).toString(), 10));
+            this.upkeep.setText(padString("0", 10));
+            this.tweens.add({
+                targets: this.ui,
+                ease: 'Cubic',
+                duration: 600,
+                y: "-="+(this.height*2).toString()
+            });
+        }, this); 
+
+        this.getEvents().on(events.hide_ui, function()
         {
             this.tweens.killAll();
             this.ui.setPosition(this.cameras.main.width/2, this.cameras.main.height - 16 - this.height/2 + this.height*2);
         }, this);
 
-        this.events.on(events.shake_treasury, function(player_id)
+        this.getEvents().on(events.shake_treasury, function(player_id)
         {
             if (player_id != this.player_id)
                 return;
@@ -269,31 +291,11 @@ export class UIScene extends Phaser.Scene
             this.tween_map.delete(this.upkeep);
             this.lerpNumericText(this.upkeep, previous_value, value);
         }, this);
-
     }
 
     setWorld(world)
     {
         this.world = world;
-        this.world.events.on(events.show_ui, function()
-        {
-            this.colour = world.player_colours[this.player_id];
-            this.background.setTint(this.colour);
-            this.treasury.setTint(this.colour);
-            this.income.setTint(this.colour);
-            this.upkeep.setTint(this.colour);
-            this.treasury.setText(padString(this.registry.get("treasury"+this.player_id.toString()).toString(), 10));
-            this.income.setText(padString(this.registry.get("income"+this.player_id.toString()).toString(), 10));
-            this.upkeep.setText(padString("0", 10));
-            this.tweens.add({
-                targets: this.ui,
-                ease: 'Cubic',
-                duration: 600,
-                y: "-="+(this.height*2).toString()
-            });
-
-        }, this); 
-        this.world.events.emit(events.territory_change);
         this.initEventHandlers();
     }
 }

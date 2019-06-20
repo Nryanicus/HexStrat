@@ -1,29 +1,29 @@
 import * as hexLib from "./misc/hex-functions.mjs";
-import {hex_layout, black, grey, unit_cost, capitol_pixel_columns, capitol_death_pixels, capitol} from "./misc/constants.mjs";
+import {hex_layout, black, grey, unit_cost, capitol_pixel_columns, capitol_death_pixels, sword, pike, cavalry, musket, capitol} from "./misc/constants.mjs";
 import {range, getRandomInt, getRandomFloat, lerpColour} from "./misc/utilities.mjs";
 import * as events from "./misc/events.mjs";
 import {Unit} from "./Unit.mjs";
 
 export class Capitol extends Phaser.GameObjects.Container 
 {
-    gameState()
+    getGameState()
     {
-        return this.registry.get(events.game_state);
+        return this.scene.registry.get(events.game_state);
     }
 
     hex()
     {
-        return this.gameState().capitols[this.owner_id].hex;
+        return this.getGameState().capitols[this.owner_id].hex;
     }
 
     lives()
     {
-        return this.gameState().capitols[this.owner_id].lives;
+        return this.getGameState().capitols[this.owner_id].lives;
     }
 
-    events()
+    getEvents()
     {
-        return this.scene.events;
+        return this.scene.registry.get(events.events);
     }
 
     constructor (scene, x, y, colour, owner_id)
@@ -67,17 +67,17 @@ export class Capitol extends Phaser.GameObjects.Container
         var menu_background = this.scene.add.image(0, 0, 'purchase');
         menu_background.setTint(this.colour);
 
-        var sword = this.scene.add.image(0, 0, 'purchase_sword_select').setInteractive(this.scene.input.makePixelPerfect(1));
-        var pike = this.scene.add.image(0, 0, 'purchase_pike_select').setInteractive(this.scene.input.makePixelPerfect(1));
-        var cavalry = this.scene.add.image(0, 0, 'purchase_cavalry_select').setInteractive(this.scene.input.makePixelPerfect(1));
-        var musket = this.scene.add.image(0, 0, 'purchase_musket_select').setInteractive(this.scene.input.makePixelPerfect(1));
+        var sword_img = this.scene.add.image(0, 0, 'purchase_sword_select').setInteractive(this.scene.input.makePixelPerfect(1));
+        var pike_img = this.scene.add.image(0, 0, 'purchase_pike_select').setInteractive(this.scene.input.makePixelPerfect(1));
+        var cavalry_img = this.scene.add.image(0, 0, 'purchase_cavalry_select').setInteractive(this.scene.input.makePixelPerfect(1));
+        var musket_img = this.scene.add.image(0, 0, 'purchase_musket_select').setInteractive(this.scene.input.makePixelPerfect(1));
         var sword_glow = this.scene.add.image(0,0, 'purchase_sword_glow');
         var pike_glow = this.scene.add.image(0,0, 'purchase_pike_glow');
         var cavalry_glow = this.scene.add.image(0,0, 'purchase_cavalry_glow');
         var musket_glow = this.scene.add.image(0,0, 'purchase_musket_glow');
         var menu_options = this.scene.add.image(0, 0, 'purchase_options');
 
-        this.menu.add([menu_background, sword_glow, pike_glow, cavalry_glow, musket_glow, menu_options, sword, pike, cavalry, musket]);
+        this.menu.add([menu_background, sword_glow, pike_glow, cavalry_glow, musket_glow, menu_options, sword_img, pike_img, cavalry_img, musket_img]);
 
         this.menu.setVisible(false);
         this.menu.setActive(false);
@@ -98,18 +98,17 @@ export class Capitol extends Phaser.GameObjects.Container
         }, this);
 
         // purchasing
-        var unit_options = [sword, pike, cavalry, musket];
-        var unit_map = new Map([[sword, events.recruit_sword], [cavalry, events.recruit_cavalry], [pike, events.recruit_pike], [musket, events.recruit_musket]]);
-        var glow_map = new Map([[sword, sword_glow], [cavalry, cavalry_glow], [pike, pike_glow], [musket, musket_glow]]);
+        var unit_options = [sword_img, pike_img, cavalry_img, musket_img];
+        var unit_map = new Map([[sword_img, sword], [cavalry_img, cavalry], [pike_img, pike], [musket_img, musket]]);
+        var glow_map = new Map([[sword_img, sword_glow], [cavalry_img, cavalry_glow], [pike_img, pike_glow], [musket_img, musket_glow]]);
         unit_options.forEach(function(img)
         {
             img.on('pointerdown', function(pointer, localx, localy, event)
             {
-                if (this.owner_id == 0)
-                    this.events().emit(events.recruit_attempt, unit_map.get(img));
-                //DEBUG: let's recruit some enemy units
+                if (this.getGameState().canAfford(unit_map.get(img), this.owner_id))
+                    this.getEvents().emit(events.recruit_placement, unit_map.get(img), this.owner_id);
                 else
-                    this.events().emit(events.recruit, unit_map.get(img));
+                    this.getEvents().emit(events.shake_treasury, this.owner_id);
                 event.stopPropagation();
             }, this);
 
@@ -120,37 +119,36 @@ export class Capitol extends Phaser.GameObjects.Container
                     g.setVisible(g == glow_map.get(img));
                 });
                 this.scene.registry.set(events.cursor_outside_menu, false);
-                this.events().emit(events.hide_hex_cursor);
+                this.getEvents().emit(events.hide_hex_cursor);
             }, this);
             img.on('pointerout', function()
             {
                 glow_map.get(img).setVisible(false);
                 this.scene.registry.set(events.cursor_outside_menu, false);
-                this.events().emit(events.hide_hex_cursor);
+                this.getEvents().emit(events.hide_hex_cursor);
             }, this);
-
         }, this);
 
         // events
         this.menu.on('pointerover', function()
         {
             this.scene.registry.set(events.cursor_outside_menu, false);
-            this.events().emit(events.hide_hex_cursor);
+            this.getEvents().emit(events.hide_hex_cursor);
         }, this);
         this.menu.on('pointerout', function()
         {
             this.scene.registry.set(events.cursor_outside_menu, true);
-            this.events().emit(events.show_hex_cursor);
+            this.getEvents().emit(events.show_hex_cursor);
         }, this);
 
-        this.events().on(events.recruit, this.handleRecruit, this);
+        this.getEvents().on(events.recruit_placement, this.handleRecruitPlacement, this);
 
-        this.events().on(events.cancel_recruitment, this.handleCancelRecruit, this);
+        this.getEvents().on(events.recruit_cancel, this.handleRecruitCancel, this);
 
-        this.events().on("close_menu", this.closeMenu, this);
+        this.getEvents().on(events.close_menu, this.closeMenu, this);
     }
 
-    handleCancelRecruit(player_id, unit_type)
+    handleRecruitCancel(unit_type, player_id)
     {
         if (player_id != this.owner_id)
             return;
@@ -161,13 +159,12 @@ export class Capitol extends Phaser.GameObjects.Container
         this.flats = [];
     }
 
-    handleRecruit(type, player_id)
+    handleRecruitPlacement(type, player_id)
     {
-
         if (player_id != this.owner_id)
             return;
-        // don't check conditions, that happens in recruit_attempt
-        this.closeMenu();
+        if (this.scene.registry.get(events.menu_open));
+            this.closeMenu();
 
         var p = this.scene.cameras.main.getWorldPoint(event.x, event.y);
         var h = hexLib.hex_round(hexLib.pixel_to_hex(hex_layout, p));
@@ -175,11 +172,11 @@ export class Capitol extends Phaser.GameObjects.Container
         this.scene.registry.set(events.is_placing_unit, true);
         var utp = this.scene.add.existing(new Unit(this.scene, p.x, p.y-2, type, h, this.owner_id, this.scene.occupied, this.scene.world_string_set));
         this.scene.registry.set(events.unit_to_place, utp);
-        this.events().emit(events.recruit_cost, utp.type, player_id)
+        this.getEvents().emit(events.recruit_cost, utp.type, player_id)
 
-        hexLib.hex_ring(this.hex, 1).forEach(function(h)
+        hexLib.hex_ring(this.hex(), 1).forEach(function(h)
         {
-            if (this.scene.occupied.has(h.toString()))
+            if (this.getGameState().occupied.has(h.toString()))
                 return;
             p = hexLib.hex_to_pixel(hex_layout, h);
             var flat = this.scene.add.image(p.x, p.y, 'hex_flat').setInteractive(this.scene.input.makePixelPerfect(1));
@@ -191,10 +188,14 @@ export class Capitol extends Phaser.GameObjects.Container
                 p = this.scene.cameras.main.getWorldPoint(pointer.x, pointer.y);
                 h = hexLib.hex_round(hexLib.pixel_to_hex(hex_layout, p));
                 utp.hex = h;
-                this.scene.occupied.set(h.toString(), utp);
+
+                // set unit in game state
+                this.getEvents().emit(events.recruit_finalise, h, utp.type, this.owner_id);
+                // store in worldScene for UI, set registries for cursor state
+                this.scene.hex_to_unit.set(h.toString(), utp);
                 this.scene.registry.set(events.is_placing_unit, false);
                 this.scene.registry.set(events.unit_to_place, null);
-                this.events().emit(events.recalc_territories);
+
                 this.flats.map(f => f.destroy());
                 this.flats = [];
                 this.scene.tweens.add({
@@ -232,7 +233,7 @@ export class Capitol extends Phaser.GameObjects.Container
     {
         this.menu.setVisible(false);
         this.menu.setActive(false);
-        this.events().emit(events.show_hex_cursor);
+        this.getEvents().emit(events.show_hex_cursor);
         this.scene.registry.set(events.menu_open, false);
     } 
 
@@ -240,7 +241,7 @@ export class Capitol extends Phaser.GameObjects.Container
     {
         this.menu.setVisible(true);
         this.menu.setActive(true);
-        var m_p = hexLib.hex_to_pixel(hex_layout, hexLib.hex_add(this.hex, new hexLib.Hex(1,0,0)));
+        var m_p = hexLib.hex_to_pixel(hex_layout, hexLib.hex_add(this.hex(), new hexLib.Hex(1,0,0)));
         this.menu.setPosition(m_p.x+3, m_p.y-2);
         this.scene.registry.set(events.menu_open, true);
     }
@@ -252,7 +253,7 @@ export class Capitol extends Phaser.GameObjects.Container
             if (this.scene.registry.get(events.unit_to_place).owner_id == this.owner_id)
             {
                 var utp = this.scene.registry.get(events.unit_to_place);
-                this.events().emit(events.cancel_recruitment, this.owner_id, utp.type);
+                this.getEvents().emit(events.recruit_cancel, utp.type, this.owner_id);
             }
             else
                 return;
@@ -328,17 +329,16 @@ export class Capitol extends Phaser.GameObjects.Container
         }
         this.scene.time.delayedCall(max_duration, function()
         {
-            if (this.gameState().capitols[this.owner_id].lives == 0)
+            if (this.getGameState().capitols[this.owner_id].lives == 0)
             {
-                this.events().emit(events.player_bankrupt, this.owner_id);
+                this.getEvents().emit(events.player_bankrupt, this.owner_id);
                 // to cancel
-                this.events().off("close_menu", this.closeMenu, this);
-                this.events().off(events.recruit, this.handleRecruit, this);
-                this.events().off(events.cancel_recruitment, this.handleCancelRecruit, this);
+                this.getEvents().off(events.close_menu, this.closeMenu, this);
+                this.getEvents().off(events.recruit, this.handleRecruitPlacement, this);
+                this.getEvents().off(events.cancel_recruitment, this.handleCancelRecruit, this);
                 // TODO more comprehensive removal from game system. e.g. AI
                 this.destroy();
             }
         }, [], this);
-
     }
 }
