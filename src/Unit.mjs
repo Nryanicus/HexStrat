@@ -1,5 +1,4 @@
-import {aStar} from "./misc/aStar.mjs";
-import {combatResult} from "./GameLogic.mjs";
+import * as GameLogic from "./GameLogic.mjs";
 import {sword, pike, cavalry, musket, capitol, hex_layout, grey, black, red, white, exclude_death_pixel, death_pixel_dirc, one_normal, unit_movement, victory, defeat, draw, attack_capitol} from "./misc/constants.mjs";
 import {lerpColour, getRandomFloat, range, getRandomInt} from "./misc/utilities.mjs";
 import * as hexLib from "./misc/hex-functions.mjs";
@@ -63,6 +62,16 @@ function get_attack_indication(h)
 export class Unit extends Phaser.GameObjects.Image 
 {
 
+    getGameState()
+    {
+        return this.scene.registry.get(events.game_state);
+    }
+
+    getEvents()
+    {
+        return this.scene.registry.get(events.events);
+    }
+
     constructor (scene, x, y, type, hex, owner_id)
     {
         super(scene, x, y);
@@ -80,27 +89,20 @@ export class Unit extends Phaser.GameObjects.Image
 
         this.move_range = unit_movement.get(type);
 
-        this.scene.events.on(events.end_round, this.handleRoundEnd, this);
-        this.scene.events.on(events.player_bankrupt, this.bankrupcyCheck, this);
+        this.getEvents().on(events.end_turn, this.handleEndTurn, this);
+        this.getEvents().on(events.player_bankrupt, this.handleBankrupcy, this);
     }
 
-    bankrupcyCheck(player_id)
+    handleBankrupcy(player_id)
     {
         if (player_id == this.owner_id)
-        {
-            var s = this.scene;
             this.die(true);
-            s.events.emit(events.recalc_territories);
-        }
     }
 
     handlePointerDown()
     {
-        if (!this.can_move || this.scene.registry.get(events.is_placing_unit))
+        if (!this.can_move || this.scene.registry.get(events.is_placing_unit) || this.owner_id != this.getGameState().current_player)
             return;
-        this.can_move = false;
-
-        this.scene.occupied.delete(this.hex.toString());
 
         var p = hexLib.hex_to_pixel(hex_layout, this.hex);
         var utp = this.scene.add.image(p.x, p.y-2, this.type);
@@ -110,45 +112,29 @@ export class Unit extends Phaser.GameObjects.Image
         this.scene.registry.set(events.unit_to_place, utp);
 
         // determine where the unit can be placed
-        var valid_positions = this.gameState.getValidMovementHexes(this, this.hex);
-        var possible_destinations = [this.hex];
-        var possible_paths = new Map([[this.hex.toString(), []]]);
-        var dest_is_attack = new Map([[this.hex.toString(), false]]);
-        var attack_targets = new Map();
-        var pf = new aStar(valid_positions, true);
-        hexLib.hex_spiral(this.hex, this.move_range+1).forEach(function(h)
-        {
-            var is_attack = false;
-            if (!this.scene.world_string_set.has(h.toString()))
-                return;
-            if (this.scene.occupied.has(h.toString()))
-            {
-                if (this.scene.occupied.get(h.toString()).owner_id != this.owner_id)
-                {
-                    is_attack = true;
-                    attack_targets.set(h.toString(), this.scene.occupied.get(h.toString()));
-                }
-                else
-                    return;
-            }
-            var path = pf.findPath(this.hex, h);
-            if (path.length > 0 && path.length <= this.move_range)
-            {
-                // attacks can not be launched from occupied hexes
-                if (is_attack && this.scene.occupied.has(path[1].toString()))
-                    return;
-                possible_destinations.push(h);
-                possible_paths.set(h.toString(), path);
-                dest_is_attack.set(h.toString(), is_attack);
-            }
-        }, this);
+        var possible_moves = this.getGameState().getMovesForUnit(this, this.hex);
+        // don't want to list the same space twice, though we may be able to get there by multiple moves
+        var marked_destinations = new Set(); 
 
-        var previous_hex = new hexLib.Hex(0,0,0);
+        var pf = this.getGameState().getPathfinderFor(this.hex, false);
+
+        var previous_hex = this.hex;
         var flats = [];
         var inds = [];
-        possible_destinations.forEach(function(h)
+        possible_moves.forEach(function(m)
         {
-            var is_attack = dest_is_attack.get(h.toString());
+            // we don't need the gamestate, just the action
+            m = m.action;
+
+            var h = m.to;
+            if (m.type == GameLogic.attack_bounce_to) h = m.target;
+
+            // prevent duplicate indicators, see above
+            if (marked_destinations.has(h.toString())) return;
+            marked_destinations.add(h.toString());
+
+            var is_attack = (m.type != GameLogic.move_to);
+
             p = hexLib.hex_to_pixel(hex_layout, h);
             var flat = this.scene.add.image(p.x, p.y, 'hex_flat').setInteractive(this.scene.input.makePixelPerfect(1));
             flat.setBlendMode(Phaser.BlendModes.ADD);
@@ -160,8 +146,7 @@ export class Unit extends Phaser.GameObjects.Image
                 inds.push(ind);
                 ind.setVisible(false);
                 var col = this.scene.player_colours[this.owner_id];
-                var attack_targ = attack_targets.get(h.toString());
-                var col2 = this.scene.player_colours[attack_targ.owner_id];
+                var col2 = this.scene.player_colours[this.scene.hex_to_sprite.get(h.toString()).owner_id];
                 ind.setTint(col);
                 ind.depth = 2;
                 flat.on('pointerover', function(pointer, localx, localy, event)
@@ -176,7 +161,8 @@ export class Unit extends Phaser.GameObjects.Image
                     {
                         return;
                     }
-                    var path = possible_paths.get(previous_hex.toString())
+                    // don't show indicator if we don't have the range to attack from this direction
+                    var path = pf.findPath(this.hex, previous_hex);
                     if (path.length+1 > this.move_range)
                         return;
 
@@ -217,11 +203,6 @@ export class Unit extends Phaser.GameObjects.Image
                 {
                     ind.setVisible(false);
                 }, this);
-                this.scene.events.on(events.hexout, function(hex)
-                {
-                    if (hex.toString() == h.toString())
-                        ind.setVisible(false);
-                }, this);
             }
             flat.on('pointerover', function(pointer, localx, localy, event)
             {
@@ -230,11 +211,9 @@ export class Unit extends Phaser.GameObjects.Image
             }, this);
             flat.on('pointerdown', function(pointer, localx, localy, event)
             {
-                if (is_attack && possible_paths.get(previous_hex.toString()).length+1 > this.move_range)
+                // can't attack from angles that exceed our movement range
+                if (is_attack && pf.findPath(this.hex, previous_hex).length+1 > this.move_range)
                     return;
-                p = this.scene.cameras.main.getWorldPoint(pointer.x, pointer.y);
-                h = hexLib.hex_round(hexLib.pixel_to_hex(hex_layout, p));
-                p = hexLib.hex_to_pixel(hex_layout, h);
                 this.scene.registry.set(events.is_placing_unit, false);
                 this.scene.registry.set(events.unit_to_place, null);
                 utp.destroy();
@@ -242,9 +221,9 @@ export class Unit extends Phaser.GameObjects.Image
                 flats.map(f => f.destroy());
                 // lerp into position along path
                 if (is_attack)
-                    this.attackTo(h, possible_paths.get(previous_hex.toString()));
+                    this.attackTo(h, pf.findPath(this.hex, previous_hex));
                 else
-                    this.moveTo(h, possible_paths.get(h.toString()));
+                    this.moveTo(h, pf.findPath(this.hex, h));
                 // todo have attack anim and UI
                 event.stopPropagation();
             }, this);
@@ -268,7 +247,7 @@ export class Unit extends Phaser.GameObjects.Image
         var delay = (path.length+4)*120;
         // delay depends on result
         var enemy = this.scene.occupied.get(h_ult.toString());
-        var result = combatResult(this.type, enemy.type);
+        var result = GameLogic.combatResult(this.type, enemy.type);
         if (result == victory)
             delay += 120;
         else if (result == defeat)
@@ -286,6 +265,8 @@ export class Unit extends Phaser.GameObjects.Image
 
     attackTo(h_ult, path)
     {
+        var from_hex = this.hex;
+
         this.can_move = false;
 
         path = path.reverse();
@@ -315,8 +296,8 @@ export class Unit extends Phaser.GameObjects.Image
         [img_id, flipx, flipy, x, y] = get_attack_indication(diff);
         var mid_p = {x: p_penult.x/2 + p_ult.x/2, y: p_penult.y/2 + p_ult.y/2};
 
-        var enemy = this.scene.occupied.get(h_ult.toString());
-        var result = combatResult(this.type, enemy.type);
+        var enemy = this.scene.hex_to_unit.get(h_ult.toString());
+        var result = GameLogic.combatResult(this.type, enemy.type);
 
         if (!enemy.can_move && result != attack_capitol)
             enemy.standUp(120*i);
@@ -370,9 +351,8 @@ export class Unit extends Phaser.GameObjects.Image
                 onComplete: function()
                 {
                     enemy.die(false);
-                    this.scene.occupied.set(h_ult.toString(), this);
                     this.hex = h_ult;
-                    this.scene.events.emit(events.recalc_territories);
+                    this.getEvents().emit(events.attack_to, from_hex, h_ult, h_penult, this.owner_id, victory);
                 },
                 onCompleteScope: this
             });
@@ -389,11 +369,10 @@ export class Unit extends Phaser.GameObjects.Image
                 y: p_ult.y,
                 onComplete: function()
                 {
-                    var world = this.scene;
-                    this.die(false);
-                    world.events.emit(events.recalc_territories);
                     enemy.greyOut(0);
                     enemy.can_move = false;
+                    this.getEvents().emit(events.attack_to, from_hex, h_ult, h_penult, this.owner_id, defeat);
+                    this.die(false);
                 },
                 onCompleteScope: this
             });   
@@ -456,11 +435,10 @@ export class Unit extends Phaser.GameObjects.Image
                 onComplete: function()
                 {
                     this.hex = h_penult;
-                    this.scene.occupied.set(h_penult.toString(), this);
                     this.hex = h_penult;
-                    this.scene.events.emit(events.recalc_territories);
                     enemy.greyOut(0);
                     enemy.can_move = false;
+                    this.getEvents().emit(events.attack_to, from_hex, h_ult, h_penult, this.owner_id, draw);
                 },
                 onCompleteScope: this
             });
@@ -468,7 +446,7 @@ export class Unit extends Phaser.GameObjects.Image
         }
         else // attack cap
         {
-            var cap_dead = enemy.lives == 1;
+            var cap_dead = enemy.lives() == 1;
             var h;
             if (cap_dead)
                 h = h_ult
@@ -484,9 +462,9 @@ export class Unit extends Phaser.GameObjects.Image
                 onComplete: function()
                 {
                     enemy.loseLife();
-                    this.scene.occupied.set(h.toString(), this);
                     this.hex = h;
-                    this.scene.events.emit(events.recalc_territories);
+                    var res = cap_dead ? victory : draw;
+                    this.getEvents().emit(events.attack_to, from_hex, h_ult, h_penult, this.owner_id, res);
                 },
                 onCompleteScope: this
             });
@@ -519,10 +497,9 @@ export class Unit extends Phaser.GameObjects.Image
 
         // put us back in place
         if (this.can_move)
-        {
-            this.scene.occupied.set(h.toString(), this);
             return;
-        }
+
+        var from_hex = this.hex;
 
         path = path.reverse();
 
@@ -543,13 +520,11 @@ export class Unit extends Phaser.GameObjects.Image
 
         this.scene.time.delayedCall(120*i, function()
         {
-            this.scene.occupied.set(h.toString(), this);
             this.hex = h;
-            this.scene.events.emit(events.recalc_territories);
+            this.getEvents().emit(events.move_to, from_hex, h, this.owner_id);
         }, [], this);
 
         this.greyOut(120*i);
-        return 120*i+600;
     }
 
     greyOut(delay)
@@ -602,8 +577,9 @@ export class Unit extends Phaser.GameObjects.Image
         });        
     }
 
-    handleRoundEnd()
+    handleEndTurn(player_id)
     {
+        if (player_id != this.owner_id) return;
         if (! this.can_move)
             this.standUp();
         this.can_move = true;
@@ -660,10 +636,9 @@ export class Unit extends Phaser.GameObjects.Image
                 onUpdateScope: this
             }, this);
         }, this);
-        this.scene.occupied.delete(this.hex.toString());
-        this.scene.events.emit(events.unit_death, this)
-        this.scene.events.off(events.player_bankrupt, this.bankrupcyCheck, this);
-        this.scene.events.off(events.end_round, this.handleRoundEnd, this);
+        this.getEvents().off(events.end_turn, this.handleEndTurn, this);
+        this.getEvents().off(events.player_bankrupt, this.handleBankrupcy, this);
+
         this.destroy();
     }
 }

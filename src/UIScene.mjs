@@ -2,6 +2,8 @@ import * as events from "./misc/events.mjs";
 import {getRandomInt, getRandomFloat, padString, lerpColour} from "./misc/utilities.mjs";
 import {unit_cost, white, red, sword, pike, cavalry, musket} from "./misc/constants.mjs";
 
+const original_x_pos = 552;
+
 export class UIScene extends Phaser.Scene
 {
 
@@ -123,7 +125,12 @@ export class UIScene extends Phaser.Scene
             {
                 target.setTint(lerpColour(this.colour, white, tween3.getValue()));
             },
-            onUpdateScope: this
+            onUpdateScope: this,
+            onComplete: function()
+            {
+                target.setTint(this.colour);
+            },
+            onCompleteScope: this
         }, this);
 
         this.tween_map.set(target, [tween, tween2, tween3]);
@@ -145,15 +152,15 @@ export class UIScene extends Phaser.Scene
         var musket_select = this.add.image(0, 0, "musket_select");;
         var end_turn_select = this.add.image(0, 0, "end_turn_select");;
         
-        this.treasury = this.add.bitmapText(552, -10, 'font').setOrigin(1, 0.5);
+        this.treasury = this.add.bitmapText(original_x_pos, -10, 'font').setOrigin(1, 0.5);
         this.treasury.setScale(2, 2);
         this.treasury.setLetterSpacing(2);
         this.original_positions.set(this.treasury, -10);
-        this.income = this.add.bitmapText(552, 18, 'font').setOrigin(1, 0.5);
+        this.income = this.add.bitmapText(original_x_pos, 18, 'font').setOrigin(1, 0.5);
         this.income.setScale(2, 2);
         this.income.setLetterSpacing(2);
         this.original_positions.set(this.income, 18);
-        this.upkeep = this.add.bitmapText(552, 46, 'font').setOrigin(1, 0.5);
+        this.upkeep = this.add.bitmapText(original_x_pos, 46, 'font').setOrigin(1, 0.5);
         this.upkeep.setScale(2, 2);
         this.upkeep.setLetterSpacing(2);
         this.original_positions.set(this.upkeep, 46);
@@ -206,6 +213,18 @@ export class UIScene extends Phaser.Scene
                 glow_map.get(img).setVisible(false);
             }, this);
         }, this);
+    }
+
+    // remove all tweens, set to a standarised position with current data
+    // target: one of: this. treasury, income, upkeep
+    normalise(target)
+    {
+        if (this.tween_map.has(target))
+            this.tween_map.get(target).map(t => t.remove());
+        this.tween_map.delete(target);
+
+        target.setPosition(original_x_pos, this.original_positions.get(target));
+        target.setTint(this.colour);
     }
 
     initEventHandlers()
@@ -272,23 +291,17 @@ export class UIScene extends Phaser.Scene
 
         this.registry.events.on("changedata-treasury"+this.player_id.toString(), function(parent, value, previous_value)
         {
-            if (this.tween_map.has(this.treasury))
-                this.tween_map.get(this.treasury).map(t => t.remove());
-            this.tween_map.delete(this.treasury);
+            this.normalise(this.treasury);
             this.lerpNumericText(this.treasury, previous_value, value);
         }, this);
         this.registry.events.on("changedata-income"+this.player_id.toString(), function(parent, value, previous_value)
         {
-            if (this.tween_map.has(this.income))
-                this.tween_map.get(this.income).map(t => t.remove());
-            this.tween_map.delete(this.income);
+            this.normalise(this.income);
             this.lerpNumericText(this.income, previous_value, value);
         }, this);
         this.registry.events.on("changedata-upkeep"+this.player_id.toString(), function(parent, value, previous_value)
         {
-            if (this.tween_map.has(this.upkeep))
-                this.tween_map.get(this.upkeep).map(t => t.remove());
-            this.tween_map.delete(this.upkeep);
+            this.normalise(this.upkeep);
             this.lerpNumericText(this.upkeep, previous_value, value);
         }, this);
     }

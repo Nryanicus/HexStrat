@@ -3,11 +3,11 @@ import {victory, defeat, draw, attack_capitol, sword, pike, cavalry, musket, cap
 import {aStar} from "./misc/aStar.mjs";
 import {shuffle} from "./misc/utilities.mjs";
 import * as WorldFunctions from "./world_functions.mjs";
-// import {generateWorld, placeCapitols, determineTerritories} from "./world_functions.mjs";
 
 // exceptions
-export const BadTransistion = "BadTransistion";
-export const BadPlayerId = "BadPlayerId";
+const BadTransistion = "BadTransistion";
+const BadPlayerId = "BadPlayerId";
+const BadPathfinderRequest = "BadPathfinderRequest";
 const BogusUnitType = "bogus unit type";
 
 // GameLogic actions
@@ -110,7 +110,7 @@ export function generateWorld(args={num_players: null, seed: null, world_size: n
     return gs;
 }
 
-export class GameState
+class GameState
 {
     constructor(current_player, world, world_hex_set, pathfinder, occupied, capitols, treasuries, incomes, upkeeps)
     {
@@ -223,6 +223,13 @@ export class GameState
         return valid_positions;
     }
 
+    getPathfinderFor(hex)
+    {
+        if (!this.occupied.has(hex.toString()))
+            throw BadPathfinderRequest;
+        return new aStar(this.getValidMovementHexes(this.occupied.get(hex.toString()), hex));
+    }
+
     // remove all units of a given player, for bankrupcy or cap killing
     removeAllUnits(player_id)
     {
@@ -230,25 +237,6 @@ export class GameState
         {
             if (unit.owner_id == player_id)
                 this.occupied.delete(hex);
-        }, this);
-    }
-
-    // increment current player, do end of round updates if appropriate
-    endTurn()
-    {
-        this.current_player = 0;
-        for (var player_id=0; player_id<this.num_players; player_id++)
-        {
-            var inc = this.incomes[player_id];
-            var up = this.upkeeps[player_id];
-            var net = inc - up;
-            this.treasuries[player_id] += net;
-            if (this.treasuries[player_id] < 0)
-                this.removeAllUnits(player_id);
-        }
-        this.occupied.forEach(function(unit, hex, map)
-        {
-            unit.can_move = unit.type != capitol;
         }, this);
     }
 
@@ -268,12 +256,26 @@ export class GameState
     //        transistion legality checks        //
     ///////////////////////////////////////////////
 
-    canRecruit(hex, type, player_id)
+    canRecruit(hex, type, player_id, debug=false)
     {
         if (player_id >= this.num_players)
             throw(BadPlayerId);
         var cost = unit_cost.get(type);
         var cap_ring = hexLib.hex_ring(this.capitols[player_id].hex, 1).map(h => h.toString());
+        if (debug)
+        {
+            console.log(arguments);
+            console.log(this)
+            console.log(cost);
+            console.log(cost);
+            console.log(cap_ring);
+
+            console.log(this.current_player == player_id)
+            console.log(cost <= this.treasuries[player_id])
+            console.log(!this.occupied.has(hex.toString()))
+            console.log(this.world_hex_set.has(hex.toString()))
+            console.log(cap_ring.includes(hex.toString()))
+        }
         return  this.current_player == player_id &&
                 cost <= this.treasuries[player_id] &&
                 !this.occupied.has(hex.toString()) &&
@@ -281,33 +283,62 @@ export class GameState
                 cap_ring.includes(hex.toString());
     }
 
-    canMove(source, dest, pf, player_id)
+    canMove(source, dest, player_id, pf, debug=false)
     {
         var path = pf.findPath(source, dest);
         if (player_id >= this.num_players)
             throw(BadPlayerId);
+        if (debug)
+        {
+            console.log(arguments);
+            console.log(this);
+            console.log(path);
+            console.log(this.current_player == player_id);
+            console.log(!this.occupied.has(dest.toString()) || dest.toString() == source.toString());
+            console.log(this.world_hex_set.has(dest.toString()));
+            console.log(this.occupied.has(source.toString()));
+            console.log(this.occupied.get(source.toString()).owner_id == player_id);
+            console.log(this.occupied.get(source.toString()).can_move);
+            console.log(path.length <= unit_movement.get(this.occupied.get(source.toString()).type));
+        }
         return  this.current_player == player_id &&
-                !this.occupied.has(dest.toString()) &&
+                (!this.occupied.has(dest.toString())  || dest.toString() == source.toString()) &&
                 this.world_hex_set.has(dest.toString()) &&
                 this.occupied.has(source.toString()) &&
                 this.occupied.get(source.toString()).owner_id == player_id &&
                 this.occupied.get(source.toString()).can_move &&
-                path.length <= this.occupied.get(source.toString()).move_range;
+                path.length <= unit_movement.get(this.occupied.get(source.toString()).type);
     }
 
-    canAttackFromDirection(source, dest, penult, pf, player_id)
+    canAttackFromDirection(source, dest, penult, player_id, pf, debug=false)
     {
         if (player_id >= this.num_players)
             throw(BadPlayerId);
-        var path = pf.findPath(source, dest);
+        var path = pf.findPath(source, penult);
+        if (debug)
+        {
+            console.log(arguments);
+            console.log(this);
+            console.log(path);
+            console.log(this.current_player == player_id);
+            console.log(this.occupied.has(dest.toString()));
+            console.log(this.occupied.get(dest.toString()).owner_id != player_id);
+            console.log(this.occupied.get(dest.toString()).owner_id != this.occupied.get(source.toString()).owner_id);
+            console.log(!this.occupied.has(penult.toString()) || penult.toString() == source.toString());
+            console.log(this.occupied.has(source.toString()));
+            console.log(this.occupied.get(source.toString()).owner_id == player_id);
+            console.log(this.occupied.get(source.toString()).can_move);
+            console.log(path.length+1 <= unit_movement.get(this.occupied.get(source.toString()).type));
+        }
         return  this.current_player == player_id &&
                 this.occupied.has(dest.toString()) &&
-                this.occupied.has(dest.toString()).owner_id != player_id &&
-                !this.occupied.has(penult.toString()) &&
+                this.occupied.get(dest.toString()).owner_id != player_id &&
+                this.occupied.get(dest.toString()).owner_id != this.occupied.get(source.toString()).owner_id &&
+                (!this.occupied.has(penult.toString()) || penult.toString() == source.toString()) &&
                 this.occupied.has(source.toString()) &&
                 this.occupied.get(source.toString()).owner_id == player_id &&
                 this.occupied.get(source.toString()).can_move &&
-                path.length <= this.occupied.get(source.toString()).move_range;
+                path.length+1 <= unit_movement.get(this.occupied.get(source.toString()).type);
     }
 
     ///////////////////////////////////////////////
@@ -319,7 +350,7 @@ export class GameState
     {
         if (!this.canRecruit(hex, type, player_id))
         {
-            console.log(arguments);
+            this.canRecruit(hex, type, player_id, true);
             throw(BadTransistion);
         }
         var move = this.clone();
@@ -332,11 +363,13 @@ export class GameState
         return move;
     }
 
-    movementMove(source, dest, pf, player_id)
+    movementMove(source, dest, player_id, pf=null)
     {
-        if (!this.canMove(source, dest, pf, player_id))
+        if (!pf)
+            pf = this.getPathfinderFor(source);
+        if (!this.canMove(source, dest, player_id, pf))
         {
-            console.log(arguments);
+            this.canMove(source, dest, player_id, pf, true);
             throw(BadTransistion);
         }
         var move = this.clone();
@@ -349,11 +382,13 @@ export class GameState
         return move;
     }
 
-    attackMove(source, dest, penult, pf, player_id)
+    attackMove(source, dest, penult, player_id, pf=null)
     {
-        if (!this.canAttackFromDirection(source, dest, penult, pf, player_id))
+        if (!pf)
+            pf = this.getPathfinderFor(source);
+        if (!this.canAttackFromDirection(source, dest, penult, player_id, pf))
         {
-            console.log(arguments);
+            this.canAttackFromDirection(source, dest, penult, player_id, pf, true);
             throw(BadTransistion);
         }
 
@@ -361,7 +396,12 @@ export class GameState
         var result = combatResult(this.occupied.get(source.toString()).type, this.occupied.get(dest.toString()).type);
         if (result == victory)
         {
-            move = this.movementMove(source, dest);
+            var move = this.clone();
+            var unit = move.occupied.get(source.toString());
+            move.occupied.set(dest.toString(), unit);
+            move.occupied.delete(source.toString());
+            unit.can_move = false;
+            move.updateIncomes();
             var enemy = move.occupied.get(dest.toString());
             move.upkeeps[enemy.owner_id] -= unit_cost.get(enemy.type);
             move.action = {type: attack_to, from: source, to: dest};
@@ -419,18 +459,48 @@ export class GameState
     endTurnMove()
     {
         var move = this.clone();
-        var do_incomes = (this.current_player == this.num_players-1);
-        if (do_incomes)
-            move.endTurn();
-        else
-            move.current_player++;
+        // econ
+        var inc = move.incomes[move.current_player];
+        var up = move.upkeeps[move.current_player];
+        var net = inc - up;
+        move.treasuries[move.current_player] += net;
+        // bankrupcy
+        if (move.treasuries[move.current_player] < 0)
+            move.removeAllUnits(move.current_player);
+        // movement
+        move.occupied.forEach(function(unit, hex, map)
+        {
+            if (unit.owner_id != move.current_player) return;
+            unit.can_move = unit.type != capitol;
+        });
         move.action = {type: end_turn};
+        // increment player
+        move.current_player++;
+        if (move.current_player == move.num_players)
+            move.current_player = 0;
         return move;
     }
 
     ///////////////////////////////////////////////
     //              AI functions                 //
     ///////////////////////////////////////////////
+
+    // return a list of all valid moves for the given unit in the given hex for the current game state
+    getMovesForUnit(unit, hex)
+    {
+        var pf = this.getPathfinderFor(hex);
+        var moves = [this.movementMove(hex, hex, this.current_player, pf)];
+        hexLib.hex_spiral(hex, unit_movement.get(unit.type)+1).forEach(function(hc)
+        {
+            // attack moves
+            moves = moves.concat(this.attackMoves(hex, hc, pf));
+            // normal move
+            if (this.canMove(hex, hc, unit.owner_id, pf))
+                moves.push(this.movementMove(hex, hc, this.current_player, pf));
+        }, this);
+
+        return moves;
+    }
 
     // return a list of all valid moves from a the current game state
     getValidMoves()
@@ -447,21 +517,8 @@ export class GameState
             {
                 // this is repeated in the legality functions, but early exit is helpful for our AI
                 if (unit.owner_id != this.current_player || !unit.can_move)
-                    return;
-                hex = hexLib.fromString(hex);
-                var pf = new aStar(this.getValidMovementHexes(unit, hex), true);
-                hexLib.hex_spiral(hex, unit_movement.get(unit.type)+1).forEach(function(hc)
-                {
-                    // ditto above for the checks here
-                    if (!this.world_hex_set.has(hc.toString()))
-                        return;
-                    // attack move
-                    if (this.occupied.has(hc.toString()))
-                        moves = moves.concat(this.attackMoves(hex, hc, pf));
-                    // normal move
-                    else
-                        moves.push(this.movementMove(hex, hc, pf, this.current_player));
-                }, this);
+                    return [];
+                moves.concat(this.getMovesForUnit(unit, hexlib.fromString(hex)));
             }, this);
         }
         // end turn
@@ -488,6 +545,8 @@ export class GameState
     // return all possible attack moves from the current game state
     attackMoves(source, dest, pf)
     {
+        if (!(this.occupied.has(source.toString()) && this.occupied.has(dest.toString())))
+            return [];
         var moves = [];
         // possible attacks
         var path = pf.findPath(source, dest);
@@ -497,9 +556,9 @@ export class GameState
         for (var i=0; i<penults.length; i++)
         {
             var penult = penults[i];
-            if (this.canAttackFromDirection(source, dest, penult, pf, this.current_player))
+            if (this.canAttackFromDirection(source, dest, penult, this.current_player, pf))
             {
-                moves.push(this.attackMove(source, dest, penult, pf, this.current_player));
+                moves.push(this.attackMove(source, dest, penult, this.current_player, pf));
                 // these cases there's no point considering all attack directions, break as soon as we find a valid one
                 // last case is when killing a cap
                 if (result == victory || result == defeat ||

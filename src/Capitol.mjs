@@ -39,6 +39,7 @@ export class Capitol extends Phaser.GameObjects.Container
         this.depth = 1;
         this.pixels = new Map();
         this.flats = [];
+        this.type = capitol;
 
         // deep copy
         this.pixels_columns = [];
@@ -142,17 +143,22 @@ export class Capitol extends Phaser.GameObjects.Container
         }, this);
 
         this.getEvents().on(events.recruit_placement, this.handleRecruitPlacement, this);
-
         this.getEvents().on(events.recruit_cancel, this.handleRecruitCancel, this);
-
+        this.getEvents().on(events.end_turn, this.handleEndTurn, this);
         this.getEvents().on(events.close_menu, this.closeMenu, this);
+    }
+
+    handleEndTurn(unit_type, player_id)
+    {
+        this.handleRecruitCancel(null, player_id)
     }
 
     handleRecruitCancel(unit_type, player_id)
     {
         if (player_id != this.owner_id)
             return;
-        this.scene.registry.get(events.unit_to_place).destroy();
+        if (this.scene.registry.has(events.unit_to_place) != null)
+            this.scene.registry.get(events.unit_to_place).destroy();
         this.scene.registry.set(events.is_placing_unit, false);
         this.scene.registry.set(events.unit_to_place, null);
         this.flats.map(f => f.destroy());
@@ -190,7 +196,7 @@ export class Capitol extends Phaser.GameObjects.Container
                 utp.hex = h;
 
                 // set unit in game state
-                this.getEvents().emit(events.recruit_finalise, h, utp.type, this.owner_id);
+                this.getEvents().emit(events.recruit_finalise, h, utp, this.owner_id);
                 // store in worldScene for UI, set registries for cursor state
                 this.scene.hex_to_unit.set(h.toString(), utp);
                 this.scene.registry.set(events.is_placing_unit, false);
@@ -259,7 +265,8 @@ export class Capitol extends Phaser.GameObjects.Container
                 return;
         }
         else
-            this.openMenu();
+            if (this.owner_id == this.getGameState().current_player)
+                this.openMenu();
     }
 
     loseLife()

@@ -21,13 +21,10 @@ function heuristic(start, end)
 
 export class aStar
 {
-    constructor(hex_set, allow_goal_outside_set=false)
+    constructor(hex_set)
     {
         this.hex_set = hex_set;
         this.cache = new Map(); // {Hex+Hex, [Hex]}
-
-        // special option for attacking pathfinding, allow goal to be one hex's distance from the set
-        this.allow_goal_outside_set = allow_goal_outside_set;
     }
 
     findPath(start, goal)
@@ -61,15 +58,8 @@ export class aStar
 
             hexLib.hex_ring(current, 1).forEach(function(h)
             {
-                // console.log("examining neighbour "+h);
-                if (this.allow_goal_outside_set)
-                {
-                    if (!this.hex_set.has(h.toString()) && !(h.toString() == goal.toString()))
-                        return;
-                }
-                else
-                    if ( (! this.hex_set.has(h.toString())))
-                        return;
+                if (! this.hex_set.has(h.toString()) )
+                    return;
                 if ( closed.has(h.toString()))
                     return;
 

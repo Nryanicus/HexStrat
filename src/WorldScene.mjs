@@ -2,7 +2,6 @@
 
 import * as hexLib from "./misc/hex-functions.mjs";
 import {shuffle, lerpColour} from "./misc/utilities.mjs";
-import {aStar} from "./misc/aStar.mjs";
 import {hex_layout, player_colours, white, grey, black} from "./misc/constants.mjs";
 import * as events from "./misc/events.mjs";
 import {Unit} from "./Unit.mjs";
@@ -277,6 +276,7 @@ export class WorldScene extends Phaser.Scene
         // map interaction
         this.getEvents().on(events.hexdown, function (hex) 
         {
+            console.log("click at "+hex.toString());
             this.getEvents().emit(events.close_menu);
             if (this.hex_to_unit.has(hex.toString()))
             {

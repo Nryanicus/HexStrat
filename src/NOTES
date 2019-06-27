@@ -1,16 +1,7 @@
 BUGS:
 =============
-HexCursor sometime has inaccurate position relative to game logic (cursor over outer hex in cap-menu recruitment)
 
-attacks can still be launched from occupied areas. Related to above hexcursor bug?
-
-if turn ended too soon after movement, greyOut continues and overrides standUp
-
-unit cancelled before recruited not cleaned up properly, tweens get called
-
-AI actions need to have their animations queued better
-
-AI movement paths going OOB
+HexCursor still lagging
 
 TODO:
 =============
@@ -22,9 +13,11 @@ disable input while AI takes turn
 
 sort AI moves so all recruits happen at the end and only the last is delayed
 
-improve heuristic
-
 Seed for PRNG world gen
+
+debug option where UI/anim classes contruct a game state and compare it to the actual GameState
+
+have UI hot swap between human players
 
 --------------------
 
