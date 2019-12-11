@@ -642,4 +642,12 @@ export class Unit extends Phaser.GameObjects.Image
 
         this.destroy();
     }
+
+    cancelRecruit()
+    {
+        this.getEvents().off(events.end_turn, this.handleEndTurn, this);
+        this.getEvents().off(events.player_bankrupt, this.handleBankrupcy, this);
+
+        this.destroy();
+    }
 }

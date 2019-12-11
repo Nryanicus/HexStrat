@@ -3,6 +3,8 @@ BUGS:
 
 HexCursor still lagging
 
+units not properly registered after combat
+
 TODO:
 =============
 Juice: have enemy unit move back a single pixel when you mouse over next to them
@@ -15,9 +17,6 @@ disable input while AI takes turn
 sort AI moves so all recruits happen at the end and only the last is delayed
 
 debug option where UI/anim classes contruct a game state and compare it to the actual GameState
-
-have UI hot swap between human players
-have transistion animation
 
 --------------------
 

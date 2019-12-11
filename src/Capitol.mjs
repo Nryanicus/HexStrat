@@ -150,15 +150,17 @@ export class Capitol extends Phaser.GameObjects.Container
 
     handleEndTurn(unit_type, player_id)
     {
-        this.handleRecruitCancel(null, player_id)
+        this.closeMenu();
+        this.handleRecruitCancel(null, player_id);
     }
 
     handleRecruitCancel(unit_type, player_id)
     {
         if (player_id != this.owner_id)
             return;
-        if (this.scene.registry.has(events.unit_to_place) != null)
-            this.scene.registry.get(events.unit_to_place).destroy();
+        var utp = this.scene.registry.get(events.unit_to_place);
+        if (utp != null)
+            utp.cancelRecruit();
         this.scene.registry.set(events.is_placing_unit, false);
         this.scene.registry.set(events.unit_to_place, null);
         this.flats.map(f => f.destroy());
@@ -171,6 +173,8 @@ export class Capitol extends Phaser.GameObjects.Container
             return;
         if (this.scene.registry.get(events.menu_open));
             this.closeMenu();
+
+        console.log("blep");
 
         var p = this.scene.cameras.main.getWorldPoint(event.x, event.y);
         var h = hexLib.hex_round(hexLib.pixel_to_hex(hex_layout, p));
