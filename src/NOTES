@@ -7,25 +7,23 @@ TODO:
 =============
 Juice: have enemy unit move back a single pixel when you mouse over next to them
 
-Have non-contextual commands, e.g. end turn while recruit menu is open, cancel current context and end before performing their usual command
+Have non-contextual commands cancel current context and end before performing their usual command
+    - end turn while recruit menu is open
 
 disable input while AI takes turn
 
 sort AI moves so all recruits happen at the end and only the last is delayed
 
-Seed for PRNG world gen
-
 debug option where UI/anim classes contruct a game state and compare it to the actual GameState
 
 have UI hot swap between human players
+have transistion animation
 
 --------------------
 
-multiple human players
-
+Main menu
+    - Seed for PRNG world gen
 game over screen
-
-main menu, options
 
 NOTES:
 =============

@@ -155,14 +155,17 @@ export class UIScene extends Phaser.Scene
         this.treasury = this.add.bitmapText(original_x_pos, -10, 'font').setOrigin(1, 0.5);
         this.treasury.setScale(2, 2);
         this.treasury.setLetterSpacing(2);
+        this.treasury.setText("0");
         this.original_positions.set(this.treasury, -10);
         this.income = this.add.bitmapText(original_x_pos, 18, 'font').setOrigin(1, 0.5);
         this.income.setScale(2, 2);
         this.income.setLetterSpacing(2);
+        this.income.setText("0");
         this.original_positions.set(this.income, 18);
         this.upkeep = this.add.bitmapText(original_x_pos, 46, 'font').setOrigin(1, 0.5);
         this.upkeep.setScale(2, 2);
         this.upkeep.setLetterSpacing(2);
+        this.upkeep.setText("0");
         this.original_positions.set(this.upkeep, 46);
 
         this.ui.add([this.background, sword_glow, cavalry_glow, pike_glow, musket_glow, end_turn_glow, sword_select, cavalry_select, pike_select, musket_select, end_turn_select, this.treasury, this.income, this.upkeep]);
@@ -196,13 +199,15 @@ export class UIScene extends Phaser.Scene
             {
                 if (img != end_turn_select)
                 {
-                    if (this.getGameState().canAfford(select_map.get(img), this.player_id))
-                        this.getEvents().emit(events.recruit_placement, select_map.get(img), this.player_id);
+                    if (this.registry.get(events.is_placing_unit))
+                        this.getEvents().emit(events.recruit_cancel, this.registry.get(events.unit_to_place).type, this.registry.get("game_state").current_player);
+                    if (this.getGameState().canAfford(select_map.get(img), this.registry.get("game_state").current_player))
+                        this.getEvents().emit(events.recruit_placement, select_map.get(img), this.registry.get("game_state").current_player);
                     else
-                        this.getEvents().emit(events.shake_treasury, this.player_id);
+                        this.getEvents().emit(events.shake_treasury, this.registry.get("game_state").current_player);
                 }
                 else
-                    this.getEvents().emit(events.end_turn);
+                    this.getEvents().emit(events.end_turn_button);
             }, this);
             img.on("pointerover", function()
             {
@@ -227,18 +232,29 @@ export class UIScene extends Phaser.Scene
         target.setTint(this.colour);
     }
 
+    setPlayerInfo()
+    {
+        this.colour = this.world.player_colours[this.registry.get("game_state").current_player];
+        this.background.setTint(this.colour);
+        this.treasury.setTint(this.colour);
+        this.income.setTint(this.colour);
+        this.upkeep.setTint(this.colour);
+
+        this.normalise(this.treasury);
+        this.lerpNumericText(this.treasury, parseInt(this.treasury.text), this.registry.get("treasury")[this.registry.get("game_state").current_player]);
+        this.normalise(this.income);
+        this.lerpNumericText(this.income, parseInt(this.income.text), this.registry.get("income")[this.registry.get("game_state").current_player]);
+        this.normalise(this.upkeep);
+        this.lerpNumericText(this.upkeep, parseInt(this.upkeep.text), this.registry.get("upkeep")[this.registry.get("game_state").current_player]);
+    }
+
     initEventHandlers()
     {
+        this.getEvents().on(events.end_turn, this.setPlayerInfo, this);
+
         this.getEvents().on(events.show_ui, function()
         {
-            this.colour = this.world.player_colours[this.player_id];
-            this.background.setTint(this.colour);
-            this.treasury.setTint(this.colour);
-            this.income.setTint(this.colour);
-            this.upkeep.setTint(this.colour);
-            this.treasury.setText(padString(this.registry.get("treasury"+this.player_id.toString()).toString(), 10));
-            this.income.setText(padString(this.registry.get("income"+this.player_id.toString()).toString(), 10));
-            this.upkeep.setText(padString("0", 10));
+            this.setPlayerInfo();
             this.tweens.add({
                 targets: this.ui,
                 ease: 'Cubic',
@@ -255,7 +271,7 @@ export class UIScene extends Phaser.Scene
 
         this.getEvents().on(events.shake_treasury, function(player_id)
         {
-            if (player_id != this.player_id)
+            if (player_id != this.registry.get("game_state").current_player)
                 return;
             var tween;
             tween = this.tweens.addCounter({
@@ -289,20 +305,33 @@ export class UIScene extends Phaser.Scene
             }, this);
         }, this);
 
-        this.registry.events.on("changedata-treasury"+this.player_id.toString(), function(parent, value, previous_value)
+        // set updates on econ displays
+        this.registry.events.on("changedata-treasury", function(parent, value, previous_value)
         {
+            var id = this.registry.get("game_state").current_player;
+            var pv = previous_value[id]
+            var v = value[id];
+            if (pv == v) return;
             this.normalise(this.treasury);
-            this.lerpNumericText(this.treasury, previous_value, value);
+            this.lerpNumericText(this.treasury, pv, v);
         }, this);
-        this.registry.events.on("changedata-income"+this.player_id.toString(), function(parent, value, previous_value)
+        this.registry.events.on("changedata-income", function(parent, value, previous_value)
         {
+            var id = this.registry.get("game_state").current_player;
+            var pv = previous_value[id]
+            var v = value[id];
+            if (pv == v) return;
             this.normalise(this.income);
-            this.lerpNumericText(this.income, previous_value, value);
+            this.lerpNumericText(this.income, pv, v);
         }, this);
-        this.registry.events.on("changedata-upkeep"+this.player_id.toString(), function(parent, value, previous_value)
+        this.registry.events.on("changedata-upkeep", function(parent, value, previous_value)
         {
+            var id = this.registry.get("game_state").current_player;
+            var pv = previous_value[id]
+            var v = value[id];
+            if (pv == v) return;
             this.normalise(this.upkeep);
-            this.lerpNumericText(this.upkeep, previous_value, value);
+            this.lerpNumericText(this.upkeep, pv, v);
         }, this);
     }
 

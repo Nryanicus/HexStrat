@@ -37,14 +37,21 @@ export class MasterScene extends Phaser.Scene
     {
         this.input.keyboard.on('keyup-ENTER', function (event) 
         {
-            // can only end turn on our turn
+            // only humans can end turn via enter
             if (this.aiPlayers[this.gameState.current_player])
                 return;
             this.handleEndTurn();
-            console.log("============================");
-            console.log(this.gameState);
-            console.log("============================");
         }, this);
+
+        this.events.on(events.end_turn_button, function (event) 
+        {
+            // only humans can end turn via button
+            if (this.aiPlayers[this.gameState.current_player])
+                return;
+            this.handleEndTurn();
+        }, this);
+
+        this.events.on(events.territory_change, this.updateEconomyRegistry, this);
 
         // set econ values for UIScene to animate/display
         this.events.on(events.territory_change, this.updateEconomyRegistry, this);
@@ -53,14 +60,17 @@ export class MasterScene extends Phaser.Scene
         this.events.on(events.recruit_placement, function(unit_type, player_id)
         {
             var cost = unit_cost.get(unit_type);
-            this.registry.set("treasury"+player_id.toString(), this.gameState.treasuries[player_id]-cost);
-            this.registry.set("upkeep"+player_id.toString(), this.gameState.upkeeps[player_id]+cost);
+            var tres_temp = this.gameState.treasuries.slice();
+            tres_temp[player_id] -= cost;
+            var up_temp = this.gameState.upkeeps.slice();
+            up_temp[player_id] += cost;
+            this.registry.set("treasury", tres_temp);
+            this.registry.set("upkeep", up_temp);
         }, this);
         this.events.on(events.recruit_cancel, function(unit_type, player_id)
         {
-            var cost = unit_cost.get(unit_type);
-            this.registry.set("treasury"+player_id.toString(), this.gameState.treasuries[player_id]);
-            this.registry.set("upkeep"+player_id.toString(), this.gameState.upkeeps[player_id]);
+            this.registry.set("treasury", this.gameState.treasuries);
+            this.registry.set("upkeep", this.gameState.upkeeps);
         }, this);
 
         // interface for changing the game state
@@ -110,9 +120,9 @@ export class MasterScene extends Phaser.Scene
     {
         for (var player_id=0; player_id<this.gameState.num_players; player_id++)
         {
-            this.registry.set("treasury"+player_id.toString(), this.gameState.treasuries[player_id]);
-            this.registry.set("upkeep"+player_id.toString(), this.gameState.upkeeps[player_id]);
-            this.registry.set("income"+player_id.toString(), this.gameState.incomes[player_id]);
+            this.registry.set("treasury", this.gameState.treasuries);
+            this.registry.set("upkeep", this.gameState.upkeeps);
+            this.registry.set("income", this.gameState.incomes);
         }
     }
 

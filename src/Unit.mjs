@@ -636,6 +636,7 @@ export class Unit extends Phaser.GameObjects.Image
                 onUpdateScope: this
             }, this);
         }, this);
+        this.scene.hex_to_sprite.delete(this.hex.toString());
         this.getEvents().off(events.end_turn, this.handleEndTurn, this);
         this.getEvents().off(events.player_bankrupt, this.handleBankrupcy, this);
 

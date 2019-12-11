@@ -569,7 +569,7 @@ class GameState
         return moves;
     }
 
-    // give a value between 0 and 1 for the current game state for the given player
+    // give a value (larger is more desirable) for the current game state for the given player
     evaluation(player_id)
     {
         if (player_id >= this.num_players)

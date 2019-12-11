@@ -25,6 +25,7 @@ export const recruit_cancel    = "recruit_cancel"; // unit_type, player_id
 export const shake_treasury = "shake_treasury"; // player_id
 
 // unit and UI
+export const end_turn_button   = "end_turn_button"; // player_id
 export const end_turn   = "end_turn"; // player_id
 export const attack_to  = "attack_to"; // from, target, penult, player_id, combat_result
 export const move_to    = "move_to"; // from, to, player_id
