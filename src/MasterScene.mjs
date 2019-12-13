@@ -3,7 +3,6 @@ import {UIScene} from "./UIScene.mjs";
 import * as events from "./misc/events.mjs";
 import * as GameLogic from "./GameLogic.mjs";
 import {unit_cost, hex_layout, black, grey, victory, defeat, draw} from "./misc/constants.mjs";
-import {lerpColour} from "./misc/utilities.mjs";
 import {Unit} from "./Unit.mjs";
 import * as hexLib from "./misc/hex-functions.mjs";
 
@@ -50,8 +49,6 @@ export class MasterScene extends Phaser.Scene
                 return;
             this.handleEndTurn();
         }, this);
-
-        this.events.on(events.territory_change, this.updateEconomyRegistry, this);
 
         // set econ values for UIScene to animate/display
         this.events.on(events.territory_change, this.updateEconomyRegistry, this);

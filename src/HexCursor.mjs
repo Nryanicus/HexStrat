@@ -48,9 +48,9 @@ export class HexCursor extends Phaser.GameObjects.Image
                 this.scene.registry.get(events.unit_to_place).setPosition(p.x, p.y-2);
             if (this.scene.registry.get(events.is_placing_unit) && this.gameState().occupied.has(h.toString())
                 && this.scene.registry.get(events.unit_to_place).owner_id != this.gameState().occupied.get(h.toString()).owner_id)
-                this.setTint(red);
+                this.setTint(red.color);
             else
-                this.setTint(white);
+                this.setTint(white.color);
         }, this);
 
         this.getEvents().on(events.hide_hex_cursor, function()

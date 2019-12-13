@@ -1,5 +1,5 @@
 import * as events from "./misc/events.mjs";
-import {getRandomInt, getRandomFloat, padString, lerpColour} from "./misc/utilities.mjs";
+import {getRandomInt, getRandomFloat, padString} from "./misc/utilities.mjs";
 import {unit_cost, white, red, sword, pike, cavalry, musket} from "./misc/constants.mjs";
 
 const original_x_pos = 552;
@@ -79,7 +79,7 @@ export class UIScene extends Phaser.Scene
             from: from,
             to: to,
             ease: 'Quadratic',
-            duration: 30*diff,
+            duration: 300,
             onUpdate: function()
             {
                 var n = Math.floor(tween.getValue());
@@ -123,14 +123,9 @@ export class UIScene extends Phaser.Scene
             yoyo: true,
             onUpdate: function()
             {
-                target.setTint(lerpColour(this.colour, white, tween3.getValue()));
+                target.setTint(Phaser.Display.Color.ObjectToColor(Phaser.Display.Color.Interpolate.ColorWithColor(this.colour, white, 1, tween3.getValue())).color);
             },
-            onUpdateScope: this,
-            onComplete: function()
-            {
-                target.setTint(this.colour);
-            },
-            onCompleteScope: this
+            onUpdateScope: this
         }, this);
 
         this.tween_map.set(target, [tween, tween2, tween3]);
@@ -229,16 +224,16 @@ export class UIScene extends Phaser.Scene
         this.tween_map.delete(target);
 
         target.setPosition(original_x_pos, this.original_positions.get(target));
-        target.setTint(this.colour);
+        target.setTint(this.colour.color);
     }
 
     setPlayerInfo()
     {
         this.colour = this.world.player_colours[this.registry.get("game_state").current_player];
-        this.background.setTint(this.colour);
-        this.treasury.setTint(this.colour);
-        this.income.setTint(this.colour);
-        this.upkeep.setTint(this.colour);
+        this.background.setTint(this.colour.color);
+        this.treasury.setTint(this.colour.color);
+        this.income.setTint(this.colour.color);
+        this.upkeep.setTint(this.colour.color);
 
         this.normalise(this.treasury);
         this.lerpNumericText(this.treasury, parseInt(this.treasury.text), this.registry.get("treasury")[this.registry.get("game_state").current_player]);
@@ -282,7 +277,7 @@ export class UIScene extends Phaser.Scene
                 yoyo: true,
                 onUpdate: function()
                 {
-                    this.treasury.setTint(lerpColour(this.colour, red, tween.getValue()));
+                    this.treasury.setTint(Phaser.Display.Color.ObjectToColor(Phaser.Display.Color.Interpolate.ColorWithColor(this.colour, red, 1, tween.getValue())).color);
                 },
                 onUpdateScope: this
             }, this);

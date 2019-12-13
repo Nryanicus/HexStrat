@@ -2,23 +2,23 @@ import * as hexLib from "./hex-functions.mjs";
 
 export const hex_layout = hexLib.Layout(hexLib.layout_pointy, hexLib.Point(11.5,10.6), hexLib.Point(500,500));
 
-export const background = 0x00081f;
-export const white = 0xffffff;
-export const grey = 0x222222;
-export const black = 0x000000;
+export const background = Phaser.Display.Color.HexStringToColor("#00081f");
+export const white = Phaser.Display.Color.HexStringToColor("#ffffff");
+export const grey = Phaser.Display.Color.HexStringToColor("#222222");
+export const black = Phaser.Display.Color.HexStringToColor("#000000");
 
 // player colours
-export const purple = 0x6110a2;
-// export const grey = 0x797979;
-export const brown = 0x794100;
-export const cream = 0xffdba2;
-export const light_blue = 0x5182ff;
-export const yellow = 0xebd320;
-export const pink = 0xdb41c3;
-export const orange = 0xff7930;
-export const deep_pink = 0xdb4161;
-export const green = 0x306141;
-export const red = 0xff0000;
+export const purple = Phaser.Display.Color.HexStringToColor("#6110a2");
+// export const grey = Phaser.Display.Color.HexStringToColor("#797979");
+export const brown = Phaser.Display.Color.HexStringToColor("#794100");
+export const cream = Phaser.Display.Color.HexStringToColor("#ffdba2");
+export const light_blue = Phaser.Display.Color.HexStringToColor("#5182ff");
+export const yellow = Phaser.Display.Color.HexStringToColor("#ebd320");
+export const pink = Phaser.Display.Color.HexStringToColor("#db41c3");
+export const orange = Phaser.Display.Color.HexStringToColor("#ff7930");
+export const deep_pink = Phaser.Display.Color.HexStringToColor("#db4161");
+export const green = Phaser.Display.Color.HexStringToColor("#306141");
+export const red = Phaser.Display.Color.HexStringToColor("#ff0000");
 
 export const one_normal = 0.7071067811865475;
 

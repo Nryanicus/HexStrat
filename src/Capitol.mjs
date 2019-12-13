@@ -1,6 +1,6 @@
 import * as hexLib from "./misc/hex-functions.mjs";
 import {hex_layout, black, grey, unit_cost, capitol_pixel_columns, capitol_death_pixels, sword, pike, cavalry, musket, capitol} from "./misc/constants.mjs";
-import {range, getRandomInt, getRandomFloat, lerpColour} from "./misc/utilities.mjs";
+import {range, getRandomInt, getRandomFloat} from "./misc/utilities.mjs";
 import * as events from "./misc/events.mjs";
 import {Unit} from "./Unit.mjs";
 
@@ -66,7 +66,7 @@ export class Capitol extends Phaser.GameObjects.Container
         this.menu.setInteractive(new Phaser.Geom.Rectangle(0,0, 28, 78), Phaser.Geom.Rectangle.Contains);
         this.menu.depth = 2;
         var menu_background = this.scene.add.image(0, 0, 'purchase');
-        menu_background.setTint(this.colour);
+        menu_background.setTint(this.colour.color);
 
         var sword_img = this.scene.add.image(0, 0, 'purchase_sword_select').setInteractive(this.scene.input.makePixelPerfect(1));
         var pike_img = this.scene.add.image(0, 0, 'purchase_pike_select').setInteractive(this.scene.input.makePixelPerfect(1));
@@ -174,8 +174,6 @@ export class Capitol extends Phaser.GameObjects.Container
         if (this.scene.registry.get(events.menu_open));
             this.closeMenu();
 
-        console.log("blep");
-
         var p = this.scene.cameras.main.getWorldPoint(event.x, event.y);
         var h = hexLib.hex_round(hexLib.pixel_to_hex(hex_layout, p));
         p = hexLib.hex_to_pixel(hex_layout, h);
@@ -223,7 +221,7 @@ export class Capitol extends Phaser.GameObjects.Container
                     duration: 120,
                     onUpdate: function()
                     {
-                        utp.setTint(lerpColour(black, grey, tween.getValue()));
+                        utp.setTint(Phaser.Display.Color.ObjectToColor(Phaser.Display.Color.Interpolate.ColorWithColor(black, grey, 1, tween.getValue())).color);
                     }
                 });
                 event.stopPropagation();
@@ -330,7 +328,7 @@ export class Capitol extends Phaser.GameObjects.Container
                 delay: initial_duration,
                 onUpdate: function()
                 {
-                    pixel.setTint(lerpColour(black, col, tween.getValue()));
+                    pixel.setTint(Phaser.Display.Color.ObjectToColor(Phaser.Display.Color.Interpolate.ColorWithColor(black, col, 1, tween.getValue())).color);
                 },
                 onUpdateScope: this
             }, this);

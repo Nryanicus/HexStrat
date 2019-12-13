@@ -21,21 +21,6 @@ export function range(start, stop, step) {
     return result;
 };
 
-export function lerpColour(a, b, amount) 
-{ 
-    if (amount == 0)
-        return a;
-    if (amount == 1)
-        return b;
-    var ar = a >> 16, ag = a >> 8 & 0xff, ab = a & 0xff;
-    var br = b >> 16, bg = b >> 8 & 0xff, bb = b & 0xff;
-    var rr = ar + amount * (br - ar);
-    var rg = ag + amount * (bg - ag);
-    var rb = ab + amount * (bb - ab);
-
-    return ((1 << 24) + (rr << 16) + (rg << 8) + rb | 0);
-}
-
 export function getRandomInt(min, max) 
 {
     min = Math.ceil(min);

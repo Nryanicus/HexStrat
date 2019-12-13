@@ -1,7 +1,7 @@
 'use strict';
 
 import * as hexLib from "./misc/hex-functions.mjs";
-import {shuffle, lerpColour} from "./misc/utilities.mjs";
+import {shuffle} from "./misc/utilities.mjs";
 import {hex_layout, player_colours, white, grey, black} from "./misc/constants.mjs";
 import * as events from "./misc/events.mjs";
 import {Unit} from "./Unit.mjs";
@@ -27,6 +27,7 @@ export class WorldScene extends Phaser.Scene
 
         this.camera_controls;
         this.hex_to_sprite = new Map();
+        this.hex_to_owner = new Map();
 
         this.territories;
         this.closest_units;
@@ -159,6 +160,7 @@ export class WorldScene extends Phaser.Scene
             img.scaleY = 0;
             img.depth = depth + i;
             this.hex_to_sprite.set(h.toString(), img);
+            this.hex_to_owner.set(h.toString(), -1);
             img.setPosition(p.x, p.y);
 
             this.tweens.add({
@@ -271,7 +273,7 @@ export class WorldScene extends Phaser.Scene
             var h = hexLib.hex_round(hexLib.pixel_to_hex(hex_layout, p));
             if (this.getGameState().world_hex_set.has(h.toString()))
                 this.getEvents().emit(events.hexdown, h);
-        },this);
+        }, this);
 
         // map interaction
         this.getEvents().on(events.hexdown, function (hex) 
@@ -303,15 +305,19 @@ export class WorldScene extends Phaser.Scene
         var tween_map = new Map();
         this.hex_to_sprite.forEach(function(hex, string, map)
         {
+            var previous_owner_id = this.hex_to_owner.get(string);
             var owner_id = territories.get(string);
-            var d = this.getGameState().world_pathfinder.findPath(hexLib.fromString(string), closest_units.get(string)).length;
+            if (previous_owner_id == owner_id)
+                return;
 
+            var d = this.getGameState().world_pathfinder.findPath(hexLib.fromString(string), closest_units.get(string)).length;
             max_d = d > max_d ? d : max_d;
-            var col1 = hex.isTinted ? hex.tint : white;
+
+            var col1 = previous_owner_id != -1 ? this.player_colours[previous_owner_id] : white;
             var col2 = owner_id != -1 ? this.player_colours[owner_id] : white;
-            var initdelay = 0;
-            if (initial_delay)
-                initdelay = 300+this.getGameState().world.length+1000*owner_id;
+
+            var initdelay = initial_delay ? 300+this.getGameState().world.length+1000*owner_id : 0;
+
             var tween = this.tweens.addCounter({
                 from: 0,
                 to: 1,
@@ -320,13 +326,14 @@ export class WorldScene extends Phaser.Scene
                 delay: initdelay + d*100,
                 onUpdate: function()
                 {
-                    hex.setTint(lerpColour(col1, col2, tween_map.get(string).getValue()));
-                    hex.tint = col2;
+                    hex.setTint(Phaser.Display.Color.ObjectToColor(Phaser.Display.Color.Interpolate.ColorWithColor(col1, col2, 1, tween.getValue())).color);
                 }
             }, this);
 
             tween_map.set(string, tween);
         }, this);
+
+        this.hex_to_owner = territories;
 
         return max_d;
     }

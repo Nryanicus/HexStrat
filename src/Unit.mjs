@@ -1,6 +1,6 @@
 import * as GameLogic from "./GameLogic.mjs";
 import {sword, pike, cavalry, musket, capitol, hex_layout, grey, black, red, white, exclude_death_pixel, death_pixel_dirc, one_normal, unit_movement, victory, defeat, draw, attack_capitol} from "./misc/constants.mjs";
-import {lerpColour, getRandomFloat, range, getRandomInt} from "./misc/utilities.mjs";
+import {getRandomFloat, range, getRandomInt} from "./misc/utilities.mjs";
 import * as hexLib from "./misc/hex-functions.mjs";
 import * as events from "./misc/events.mjs";
 
@@ -146,7 +146,7 @@ export class Unit extends Phaser.GameObjects.Image
                 inds.push(ind);
                 ind.setVisible(false);
                 var col = this.scene.player_colours[this.owner_id];
-                var col2 = this.scene.player_colours[this.scene.hex_to_sprite.get(h.toString()).owner_id];
+                var col2 = this.scene.player_colours[this.scene.hex_to_unit.get(h.toString()).owner_id];
                 ind.setTint(col);
                 ind.depth = 2;
                 flat.on('pointerover', function(pointer, localx, localy, event)
@@ -190,7 +190,7 @@ export class Unit extends Phaser.GameObjects.Image
                         duration: 375,
                         onUpdate: function()
                         {
-                            ind.setTint(lerpColour(col2, col, tween.getValue()));
+                            ind.setTint(Phaser.Display.Color.ObjectToColor(Phaser.Display.Color.Interpolate.ColorWithColor(col2, col, 1, tween.getValue())).color);
                         },
                         repeat: -1
                     }, this);
@@ -539,7 +539,7 @@ export class Unit extends Phaser.GameObjects.Image
             delay: delay,
             onUpdate: function()
             {
-                this.setTint(lerpColour(black, grey, tween.getValue()));
+                this.setTint(Phaser.Display.Color.ObjectToColor(Phaser.Display.Color.Interpolate.ColorWithColor(black, grey, 1, tween.getValue())).color);
             },
             onUpdateScope: this,
         });
@@ -564,7 +564,7 @@ export class Unit extends Phaser.GameObjects.Image
             delay: delay,
             onUpdate: function()
             {
-                this.setTint(lerpColour(grey, black, tween.getValue()));
+                this.setTint(Phaser.Display.Color.ObjectToColor(Phaser.Display.Color.Interpolate.ColorWithColor(grey, black, 1, tween.getValue())).color);
             },
             onUpdateScope: this
         });
@@ -631,12 +631,12 @@ export class Unit extends Phaser.GameObjects.Image
                 delay: initial_duration,
                 onUpdate: function()
                 {
-                    pixel.setTint(lerpColour(black, col, tween.getValue()));
+                    pixel.setTint(Phaser.Display.Color.ObjectToColor(Phaser.Display.Color.Interpolate.ColorWithColor(black, col, 1, tween.getValue())).color);
                 },
                 onUpdateScope: this
             }, this);
         }, this);
-        this.scene.hex_to_sprite.delete(this.hex.toString());
+        this.scene.hex_to_unit.delete(this.hex.toString());
         this.getEvents().off(events.end_turn, this.handleEndTurn, this);
         this.getEvents().off(events.player_bankrupt, this.handleBankrupcy, this);
 
