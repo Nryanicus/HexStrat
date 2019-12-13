@@ -287,6 +287,7 @@ export class Unit extends Phaser.GameObjects.Image
         }, this);
 
         // hitstop
+        console.assert(path.length > 0);
         var h_penult = path[path.length-1];
         var p_penult = hexLib.hex_to_pixel(hex_layout, h_penult);
         var p_ult = hexLib.hex_to_pixel(hex_layout, h_ult);
@@ -434,7 +435,6 @@ export class Unit extends Phaser.GameObjects.Image
                 y: p_ult.y,
                 onComplete: function()
                 {
-                    this.hex = h_penult;
                     this.hex = h_penult;
                     enemy.greyOut(0);
                     enemy.can_move = false;

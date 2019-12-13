@@ -398,8 +398,8 @@ class GameState
         {
             var move = this.clone();
             var unit = move.occupied.get(source.toString());
-            move.occupied.set(dest.toString(), unit);
             move.occupied.delete(source.toString());
+            move.occupied.set(dest.toString(), unit);
             unit.can_move = false;
             move.updateIncomes();
             var enemy = move.occupied.get(dest.toString());
@@ -421,8 +421,8 @@ class GameState
             move = this.clone();
             var unit = move.occupied.get(source.toString());
             var enemy = move.occupied.get(dest.toString());
-            move.occupied.set(penult.toString(), unit);
             move.occupied.delete(source.toString());
+            move.occupied.set(penult.toString(), unit);
             unit.can_move = false;
             enemy.can_move = false;
             move.action = {type: attack_bounce_to, from: source, to: penult, target: dest};
