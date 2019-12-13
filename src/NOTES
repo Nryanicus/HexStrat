@@ -3,14 +3,9 @@ BUGS:
 
 HexCursor still lagging
 
-units not properly registered after combat
-
 TODO:
 =============
 Juice: have enemy unit move back a single pixel when you mouse over next to them
-
-Have non-contextual commands cancel current context and end before performing their usual command
-    - end turn while recruit menu is open
 
 disable input while AI takes turn
 

@@ -148,7 +148,7 @@ export class Capitol extends Phaser.GameObjects.Container
         this.getEvents().on(events.close_menu, this.closeMenu, this);
     }
 
-    handleEndTurn(unit_type, player_id)
+    handleEndTurn(player_id)
     {
         this.closeMenu();
         this.handleRecruitCancel(null, player_id);
