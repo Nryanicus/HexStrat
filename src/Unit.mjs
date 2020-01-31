@@ -263,7 +263,7 @@ export class Unit extends Phaser.GameObjects.Image
         return delay+600;
     }
 
-    attackTo(h_ult, path)
+    attackTo(h_ult, path, is_ai=false)
     {
         var from_hex = this.hex;
 
@@ -353,7 +353,8 @@ export class Unit extends Phaser.GameObjects.Image
                 {
                     enemy.die(false);
                     this.hex = h_ult;
-                    this.getEvents().emit(events.attack_to, from_hex, h_ult, h_penult, this.owner_id, victory);
+                    if (!is_ai)
+                        this.getEvents().emit(events.attack_to, from_hex, h_ult, h_penult, this.owner_id, victory);
                 },
                 onCompleteScope: this
             });
@@ -372,7 +373,8 @@ export class Unit extends Phaser.GameObjects.Image
                 {
                     enemy.greyOut(0);
                     enemy.can_move = false;
-                    this.getEvents().emit(events.attack_to, from_hex, h_ult, h_penult, this.owner_id, defeat);
+                    if (!is_ai)
+                        this.getEvents().emit(events.attack_to, from_hex, h_ult, h_penult, this.owner_id, defeat);
                     this.die(false);
                 },
                 onCompleteScope: this
@@ -438,7 +440,8 @@ export class Unit extends Phaser.GameObjects.Image
                     this.hex = h_penult;
                     enemy.greyOut(0);
                     enemy.can_move = false;
-                    this.getEvents().emit(events.attack_to, from_hex, h_ult, h_penult, this.owner_id, draw);
+                    if (!is_ai)
+                        this.getEvents().emit(events.attack_to, from_hex, h_ult, h_penult, this.owner_id, draw);
                 },
                 onCompleteScope: this
             });
@@ -464,7 +467,8 @@ export class Unit extends Phaser.GameObjects.Image
                     enemy.loseLife();
                     this.hex = h;
                     var res = cap_dead ? victory : draw;
-                    this.getEvents().emit(events.attack_to, from_hex, h_ult, h_penult, this.owner_id, res);
+                    if (!is_ai)
+                        this.getEvents().emit(events.attack_to, from_hex, h_ult, h_penult, this.owner_id, res);
                 },
                 onCompleteScope: this
             });
@@ -491,7 +495,7 @@ export class Unit extends Phaser.GameObjects.Image
         return path.length*120+600;
     }
 
-    moveTo(h, path)
+    moveTo(h, path, is_ai=false)
     {
         this.can_move = h.toString() == this.hex.toString();
 
@@ -521,7 +525,8 @@ export class Unit extends Phaser.GameObjects.Image
         this.scene.time.delayedCall(120*i, function()
         {
             this.hex = h;
-            this.getEvents().emit(events.move_to, from_hex, h, this.owner_id);
+            if (!is_ai)
+                this.getEvents().emit(events.move_to, from_hex, h, this.owner_id);
         }, [], this);
 
         this.greyOut(120*i);
@@ -649,5 +654,31 @@ export class Unit extends Phaser.GameObjects.Image
         this.getEvents().off(events.player_bankrupt, this.handleBankrupcy, this);
 
         this.destroy();
+    }
+
+    spawnAt(hex)
+    {
+        this.hex = hex;
+        var p = hexLib.hex_to_pixel(hex_layout, hex);
+        this.setPosition(p.x, p.y-2);
+        this.scene.tweens.add({
+            targets: this,
+            ease: 'Back',
+            easeParams: [4.5],
+            y: "+=4",
+            duration: 120,
+        });
+        var tween;
+        var unit = this;
+        tween = this.scene.tweens.addCounter({
+            from: 0,
+            to: 1,
+            ease: 'Linear',
+            duration: 120,
+            onUpdate: function()
+            {
+                unit.setTint(Phaser.Display.Color.ObjectToColor(Phaser.Display.Color.Interpolate.ColorWithColor(black, grey, 1, tween.getValue())).color);
+            }
+        });
     }
 }

@@ -2,6 +2,7 @@ import {WorldScene} from "./WorldScene.mjs";
 import {UIScene} from "./UIScene.mjs";
 import * as events from "./misc/events.mjs";
 import * as GameLogic from "./GameLogic.mjs";
+import {greedy_ai} from "./GreedyAI.mjs";
 import {unit_cost, hex_layout, black, grey, victory, defeat, draw} from "./misc/constants.mjs";
 import {Unit} from "./Unit.mjs";
 import * as hexLib from "./misc/hex-functions.mjs";
@@ -10,12 +11,13 @@ export class MasterScene extends Phaser.Scene
 {
     constructor()
     {
-        super({key:"master", plugins:["InputPlugin"]});
+        super({key:"master"});
+        // super({key:"master", plugins:["InputPlugin", "Clock"]});
     }
 
     create()
     {
-        this.aiPlayers = [false, false];
+        this.aiPlayers = [false, true];
 
         this.registry.set(events.events, this.events);
 
@@ -27,9 +29,26 @@ export class MasterScene extends Phaser.Scene
     {
         var player_id = this.gameState.current_player;
         this.gameState = this.gameState.endTurnMove();
+        console.log("======ENDTURN=======");
+        console.log(this.gameState);
+        console.log("======ENDTURN=======");
         this.updateGameState();
         this.updateEconomyRegistry();
         this.events.emit(events.end_turn, player_id);
+
+        if (this.aiPlayers[this.gameState.current_player])
+            this.aiTurn();
+    }
+
+    handleRecruitPlacement(unit_type, player_id)
+    {
+        var cost = unit_cost.get(unit_type);
+        var tres_temp = this.gameState.treasuries.slice();
+        tres_temp[player_id] -= cost;
+        var up_temp = this.gameState.upkeeps.slice();
+        up_temp[player_id] += cost;
+        this.registry.set("treasury", tres_temp);
+        this.registry.set("upkeep", up_temp);
     }
 
     initEventHandlers()
@@ -56,13 +75,7 @@ export class MasterScene extends Phaser.Scene
         // animate here
         this.events.on(events.recruit_placement, function(unit_type, player_id)
         {
-            var cost = unit_cost.get(unit_type);
-            var tres_temp = this.gameState.treasuries.slice();
-            tres_temp[player_id] -= cost;
-            var up_temp = this.gameState.upkeeps.slice();
-            up_temp[player_id] += cost;
-            this.registry.set("treasury", tres_temp);
-            this.registry.set("upkeep", up_temp);
+            this.handleRecruitPlacement(unit_type, player_id);
         }, this);
         this.events.on(events.recruit_cancel, function(unit_type, player_id)
         {
@@ -78,6 +91,7 @@ export class MasterScene extends Phaser.Scene
             this.updateGameState();
             this.updatePositions();
         }, this);
+
         this.events.on(events.move_to, function(from, to, player_id)
         {
             var unit = this.world.hex_to_unit.get(from.toString());
@@ -87,6 +101,7 @@ export class MasterScene extends Phaser.Scene
             this.updateGameState();
             this.updatePositions();
         }, this);
+
         this.events.on(events.attack_to, function(from, target, penult, player_id, result)
         {
             var unit = this.world.hex_to_unit.get(from.toString());
@@ -123,9 +138,71 @@ export class MasterScene extends Phaser.Scene
         }
     }
 
+    aiTurn()
+    {
+        var moves = greedy_ai(this.gameState);
+        console.log("===================AI turn===================");
+        console.log(this.gameState);
+        var greatest_delay = 120;
+        moves.forEach(function(m)
+        {
+            console.log(m.action);
+            if (m.action.type == GameLogic.move_to)
+            {
+                var unit = this.world.hex_to_unit.get(m.action.from.toString());
+                var pf = this.gameState.getPathfinderFor(m.action.from);
+                unit.moveTo(m.action.to, pf.findPath(m.action.from, m.action.to), true);
+
+                this.world.hex_to_unit.delete(m.action.from.toString());
+                this.world.hex_to_unit.set(m.action.to.toString(), unit);
+
+                var delay = unit.getMoveToDelay(m.action.to, pf.findPath(m.action.from, m.action.to));
+                greatest_delay = delay > greatest_delay ? delay : greatest_delay;
+            }
+            else if (m.action.type == GameLogic.attack_to || m.action.type == GameLogic.attack_bounce_to)
+            {
+                var unit = this.world.hex_to_unit.get(m.action.from.toString());
+                var enemy = this.world.hex_to_unit.get(m.action.to.toString());
+                var pf = this.gameState.getPathfinderFor(m.action.from);
+                unit.attackTo(m.action.to, pf.findPath(m.action.from, m.action.to), true);
+                var result = GameLogic.combatResult(unit.type, enemy.type);
+                this.world.hex_to_unit.delete(from.toString());
+                if (result != defeat)
+                    this.world.hex_to_unit.set(m.action.to.toString(), unit);
+
+                var h_ult = m.action.type == GameLogic.attack_to ? m.action.to : m.action.target;
+
+                var delay = unit.getAttackToDelay(h_ult, pf.findPath(m.action.from, h_ult));
+                greatest_delay = delay > greatest_delay ? delay : greatest_delay;
+            }
+            else if (m.action.type == GameLogic.recruit_at)
+            {
+                var unit = this.world.add.existing(new Unit(this.world, 0, 0, m.action.unit_type, m.action.hex, m.action.owner_id));
+                unit.spawnAt(m.action.hex);
+                this.world.hex_to_unit.set(m.action.hex.toString(), unit);
+                this.handleRecruitPlacement(m.action.unit_type, m.current_player)
+            }
+            else if (m.action.type == GameLogic.end_turn)
+            {
+                // happens at end of func
+            }
+            else
+                throw("BadAIAction");
+            this.gameState = m;
+            this.updateGameState();
+            this.updatePositions();
+        }, this);
+
+        // end turn
+        this.time.delayedCall(greatest_delay, function()
+        {
+            var player_id = this.gameState.current_player;
+            this.events.emit(events.end_turn, player_id);
+        }, [], this);
+    }
+
     initNewWorld()
     {
-        this.events.removeAllListeners();
         this.gameState = GameLogic.generateWorld();
         this.updateGameState();
 

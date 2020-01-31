@@ -18,7 +18,7 @@ export const hide_ui = "hide_ui";
 // recruitment
 export const close_menu = "close_menu";
 // for comms between Capitol, UIScene and MasterScene (to give to GameLogic)
-export const recruit_placement = "recruit_placement"; // unit_type, player_id
+export const recruit_placement = "recruit_placement"; // unit_type
 export const recruit_finalise  = "recruit_finalise"; // hex, unit, player_id
 export const recruit_cancel    = "recruit_cancel"; // unit_type, player_id
 // UI

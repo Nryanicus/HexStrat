@@ -3,13 +3,25 @@ BUGS:
 
 HexCursor still lagging
 
+Can double tap enter and have the AI turns fail is_current_player assertions
+
 TODO:
 =============
 Juice: have enemy unit move back a single pixel when you mouse over next to them
 
-disable input while AI takes turn
+AI
+    1. Kill capitols
+    2. Kill units
+    3. Take Territory
+    4. Immobalise units
+    5. build balanced army
+        5.1 build counters
+    6. spend all money
+        6.1. move units around cap away
 
-sort AI moves so all recruits happen at the end and only the last is delayed
+    disable input while AI takes turn
+
+    sort AI moves so all recruits happen at the end and only the last is delayed
 
 debug option where UI/anim classes contruct a game state and compare it to the actual GameState
 
@@ -19,7 +31,11 @@ stress test fast input to make sure tweens never put the game in an invalid repr
 
 Main menu
     - Seed for PRNG world gen
+Game menu
+    - graphs?!?
+    - gen new world
 game over screen
+Your/AI Turn Transistion Plaque
 
 NOTES:
 =============

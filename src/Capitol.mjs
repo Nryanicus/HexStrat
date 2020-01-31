@@ -178,7 +178,7 @@ export class Capitol extends Phaser.GameObjects.Container
         var h = hexLib.hex_round(hexLib.pixel_to_hex(hex_layout, p));
         p = hexLib.hex_to_pixel(hex_layout, h);
         this.scene.registry.set(events.is_placing_unit, true);
-        var utp = this.scene.add.existing(new Unit(this.scene, p.x, p.y-2, type, h, this.owner_id, this.scene.occupied, this.scene.world_string_set));
+        var utp = this.scene.add.existing(new Unit(this.scene, p.x, p.y-2, type, h, this.owner_id));
         this.scene.registry.set(events.unit_to_place, utp);
         this.getEvents().emit(events.recruit_cost, utp.type, player_id)
 
@@ -195,7 +195,6 @@ export class Capitol extends Phaser.GameObjects.Container
             {
                 p = this.scene.cameras.main.getWorldPoint(pointer.x, pointer.y);
                 h = hexLib.hex_round(hexLib.pixel_to_hex(hex_layout, p));
-                utp.hex = h;
 
                 // set unit in game state
                 this.getEvents().emit(events.recruit_finalise, h, utp, this.owner_id);
@@ -206,24 +205,9 @@ export class Capitol extends Phaser.GameObjects.Container
 
                 this.flats.map(f => f.destroy());
                 this.flats = [];
-                this.scene.tweens.add({
-                    targets: utp,
-                    ease: 'Back',
-                    easeParams: [4.5],
-                    y: "+=4",
-                    duration: 120,
-                });
-                var tween;
-                tween = this.scene.tweens.addCounter({
-                    from: 0,
-                    to: 1,
-                    ease: 'Linear',
-                    duration: 120,
-                    onUpdate: function()
-                    {
-                        utp.setTint(Phaser.Display.Color.ObjectToColor(Phaser.Display.Color.Interpolate.ColorWithColor(black, grey, 1, tween.getValue())).color);
-                    }
-                });
+                
+                utp.spawnAt(h);
+
                 event.stopPropagation();
             }, this);
             this.scene.tweens.add({

@@ -226,7 +226,11 @@ class GameState
     getPathfinderFor(hex)
     {
         if (!this.occupied.has(hex.toString()))
+        {
+            console.log(hex);
+            console.log(this.occupied);
             throw BadPathfinderRequest;
+        }
         return new aStar(this.getValidMovementHexes(this.occupied.get(hex.toString()), hex));
     }
 
@@ -489,7 +493,9 @@ class GameState
     getMovesForUnit(unit, hex)
     {
         var pf = this.getPathfinderFor(hex);
-        var moves = [this.movementMove(hex, hex, this.current_player, pf)];
+        var moves = [];
+        if (this.canMove(hex, hex, unit.owner_id, pf))
+            moves.push(this.movementMove(hex, hex, this.current_player, pf));
         hexLib.hex_spiral(hex, unit_movement.get(unit.type)+1).forEach(function(hc)
         {
             // attack moves
@@ -515,10 +521,8 @@ class GameState
             // possible movements
             this.occupied.forEach(function(unit, hex, map)
             {
-                // this is repeated in the legality functions, but early exit is helpful for our AI
-                if (unit.owner_id != this.current_player || !unit.can_move)
-                    return [];
-                moves.concat(this.getMovesForUnit(unit, hexlib.fromString(hex)));
+                var m = this.getMovesForUnit(unit, hexLib.fromString(hex));
+                moves = moves.concat(m);
             }, this);
         }
         // end turn
@@ -580,14 +584,14 @@ class GameState
             return state.incomes[player_id];
         }
 
-        // having more troops is good
+        // having more troops is good (scaled up as troop numbers are better than more expensive troops)
         function troop_score(state, player_id)
         {
             var score = 0;
             state.occupied.forEach(function(unit, hex, map)
             {
                 if (unit.owner_id == player_id)
-                    score++;
+                    score += 10;
                 else
                     score--;
             });
@@ -595,45 +599,34 @@ class GameState
         }
 
         // taking away opponents' lives is good
-        // having more lives than opponents' is better
         function life_score(state, player_id)
         {
             var score = 0;
             for (var i=0; i<state.num_players; i++)
             {
-                if (i == player_id) 
-                    score += 3*state.capitols[i].lives;
-                else
-                    score -= state.capitols[i].lives;
+                if (i != player_id) 
+                    score += 10*state.capitols[i].lives;
             }
             return score;
         }
 
-        // score on various metrics relative to the strongest player in those fields
+        // spending money is good
+        // having more upkeep than income is very bad
+        function macro_score(state, player_id)
+        {
+            var score = 0;
+            if (state.upkeeps[player_id] > state.incomes[player_id])
+                score = -state.upkeeps[player_id];
+            return score-state.treasuries[player_id];
+        }
+
+        // score on various metrics
         var total_score = 0;
-        var metrics = [income_score, troop_score, life_score]
+        var metrics = [income_score, troop_score, life_score, macro_score];
         metrics.forEach(function(score)
         {
-            var highest_score = score(this, 0);
-            var best_player = 0;
-            var scores = [highest_score];
-            for (var i=1; i<this.num_players; i++)
-            {
-                var s = score(this, i);
-                scores.push(s);
-                if (s > highest_score)
-                {
-                    highest_score = s;
-                    best_player = i;
-                }
-            }
-            // full points for being the best
-            if (best_player == player_id)
-                total_score += 1/metrics.length;
-            // otherwise normalise to the better player
-            else
-                total_score += scores[player_id]/highest_score/metrics.length;
-        });
+            total_score += score(this, player_id);
+        }, this);
         return total_score;
     }
 }
