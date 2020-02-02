@@ -18,7 +18,7 @@ export class Hex{
 
     toString()
     {
-        return "Hex(" + this.q + ',' + this.r + ',' + this.s + ")";
+        return "Hex("+this.q + ',' + this.r + ',' + this.s+")";
     }
 }
 

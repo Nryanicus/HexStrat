@@ -450,7 +450,8 @@ class GameState
                 var move = this.clone();
                 var unit = move.occupied.get(source.toString());
                 unit.can_move = false;
-                enemy.lives--;
+
+                move.capitols[enemy.owner_id].lives--;
                 move.occupied.set(penult.toString(), unit);
                 move.occupied.delete(source.toString());
                 move.action = {type: attack_bounce_to, from: source, to: penult, target: dest};
@@ -571,62 +572,5 @@ class GameState
             }
         }
         return moves;
-    }
-
-    // give a value (larger is more desirable) for the current game state for the given player
-    evaluation(player_id)
-    {
-        if (player_id >= this.num_players)
-            throw(BadPlayerId);
-        // more money is good
-        function income_score(state, player_id)
-        {
-            return state.incomes[player_id];
-        }
-
-        // having more troops is good (scaled up as troop numbers are better than more expensive troops)
-        function troop_score(state, player_id)
-        {
-            var score = 0;
-            state.occupied.forEach(function(unit, hex, map)
-            {
-                if (unit.owner_id == player_id)
-                    score += 10;
-                else
-                    score--;
-            });
-            return score;
-        }
-
-        // taking away opponents' lives is good
-        function life_score(state, player_id)
-        {
-            var score = 0;
-            for (var i=0; i<state.num_players; i++)
-            {
-                if (i != player_id) 
-                    score += 10*state.capitols[i].lives;
-            }
-            return score;
-        }
-
-        // spending money is good
-        // having more upkeep than income is very bad
-        function macro_score(state, player_id)
-        {
-            var score = 0;
-            if (state.upkeeps[player_id] > state.incomes[player_id])
-                score = -state.upkeeps[player_id];
-            return score-state.treasuries[player_id];
-        }
-
-        // score on various metrics
-        var total_score = 0;
-        var metrics = [income_score, troop_score, life_score, macro_score];
-        metrics.forEach(function(score)
-        {
-            total_score += score(this, player_id);
-        }, this);
-        return total_score;
     }
 }

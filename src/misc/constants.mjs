@@ -4,7 +4,7 @@ export const hex_layout = hexLib.Layout(hexLib.layout_pointy, hexLib.Point(11.5,
 
 export const background = Phaser.Display.Color.HexStringToColor("#00081f");
 export const white = Phaser.Display.Color.HexStringToColor("#ffffff");
-export const grey = Phaser.Display.Color.HexStringToColor("#333333");
+export const grey = Phaser.Display.Color.HexStringToColor("#252525");
 export const black = Phaser.Display.Color.HexStringToColor("#000000");
 
 // player colours

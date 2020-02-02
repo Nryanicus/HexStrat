@@ -5,6 +5,10 @@ HexCursor still lagging
 
 Can double tap enter and have the AI turns fail is_current_player assertions
 
+?? AI units moving through out of bounds hexes ??
+
+dead capitols not cleaned up properly
+
 TODO:
 =============
 Juice: have enemy unit move back a single pixel when you mouse over next to them
@@ -36,6 +40,7 @@ Game menu
     - gen new world
 game over screen
 Your/AI Turn Transistion Plaque
+AI thinking spinner
 
 NOTES:
 =============

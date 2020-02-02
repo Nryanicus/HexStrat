@@ -35,6 +35,8 @@ export class WorldScene extends Phaser.Scene
         this.player_colours;
 
         this.hex_to_unit = new Map();
+
+        this.hex_colour_tween_map = new Map();
     }
 
     preload()
@@ -278,7 +280,9 @@ export class WorldScene extends Phaser.Scene
         // map interaction
         this.getEvents().on(events.hexdown, function (hex) 
         {
-            console.log("click at "+hex.toString());
+            console.log("click at "+hex.toString()+" owned by "+this.hex_to_owner.get(hex.toString()));
+            // console.log(this.hex_to_sprite.get(hex.toString()).isTinted)
+            // console.log(this.hex_to_sprite.get(hex.toString()).tintTopLeft)
             this.getEvents().emit(events.close_menu);
             if (this.hex_to_unit.has(hex.toString()))
             {
@@ -293,16 +297,15 @@ export class WorldScene extends Phaser.Scene
         {
             this.colourTerritories(false);
         }, this);
-
     }
 
+    // need to remove currently happening tweens
     colourTerritories(initial_delay=true)
     {
         var territories, closest_units;
         [territories, closest_units] = this.getGameState().determineTerritories();
         // colour all environs, in radial fashion
         var max_d = 0;
-        var tween_map = new Map();
         this.hex_to_sprite.forEach(function(hex, string, map)
         {
             var previous_owner_id = this.hex_to_owner.get(string);
@@ -314,6 +317,11 @@ export class WorldScene extends Phaser.Scene
             max_d = d > max_d ? d : max_d;
 
             var col1 = previous_owner_id != -1 ? this.player_colours[previous_owner_id] : white;
+            if (this.hex_colour_tween_map.has(string))
+            {
+                col1 = white;//hex.tintTopLeft;
+                this.hex_colour_tween_map.get(string).remove();
+            }
             var col2 = owner_id != -1 ? this.player_colours[owner_id] : white;
 
             var initdelay = initial_delay ? 300+this.getGameState().world.length+1000*owner_id : 0;
@@ -327,10 +335,15 @@ export class WorldScene extends Phaser.Scene
                 onUpdate: function()
                 {
                     hex.setTint(Phaser.Display.Color.ObjectToColor(Phaser.Display.Color.Interpolate.ColorWithColor(col1, col2, 1, tween.getValue())).color);
-                }
-            }, this);
+                },
+                onComplete: function()
+                {
+                    this.hex_colour_tween_map.delete(string);
+                },
+                onCompleteScope: this
+            });
 
-            tween_map.set(string, tween);
+            this.hex_colour_tween_map.set(string, tween);
         }, this);
 
         this.hex_to_owner = territories;

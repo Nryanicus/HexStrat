@@ -3,7 +3,7 @@ import {UIScene} from "./UIScene.mjs";
 import * as events from "./misc/events.mjs";
 import * as GameLogic from "./GameLogic.mjs";
 import {greedy_ai} from "./GreedyAI.mjs";
-import {unit_cost, hex_layout, black, grey, victory, defeat, draw} from "./misc/constants.mjs";
+import {unit_cost, hex_layout, black, grey, victory, defeat, draw, attack_capitol} from "./misc/constants.mjs";
 import {Unit} from "./Unit.mjs";
 import * as hexLib from "./misc/hex-functions.mjs";
 
@@ -17,7 +17,7 @@ export class MasterScene extends Phaser.Scene
 
     create()
     {
-        this.aiPlayers = [false, true];
+        this.aiPlayers = [false, false];
 
         this.registry.set(events.events, this.events);
 
@@ -147,6 +147,7 @@ export class MasterScene extends Phaser.Scene
         moves.forEach(function(m)
         {
             console.log(m.action);
+            console.log(m);
             if (m.action.type == GameLogic.move_to)
             {
                 var unit = this.world.hex_to_unit.get(m.action.from.toString());
@@ -162,17 +163,50 @@ export class MasterScene extends Phaser.Scene
             else if (m.action.type == GameLogic.attack_to || m.action.type == GameLogic.attack_bounce_to)
             {
                 var unit = this.world.hex_to_unit.get(m.action.from.toString());
-                var enemy = this.world.hex_to_unit.get(m.action.to.toString());
                 var pf = this.gameState.getPathfinderFor(m.action.from);
-                unit.attackTo(m.action.to, pf.findPath(m.action.from, m.action.to), true);
+
+                var h_ult;
+                var h_penult;
+                if (m.action.type == GameLogic.attack_to)
+                {
+                    h_ult = m.action.to;
+                    h_penult = pf.findPath(m.action.from, h_ult)[path.length-1];
+                }
+                else
+                {
+                    h_ult = m.action.target;
+                    h_penult = m.action.to;
+                }
+
+                var path = pf.findPath(m.action.from, h_penult);
+
+                unit.attackTo(h_ult, path, true);
+
+                this.world.hex_to_unit.delete(m.action.from.toString());
+                
+                var enemy = this.world.hex_to_unit.get(h_ult.toString());
                 var result = GameLogic.combatResult(unit.type, enemy.type);
-                this.world.hex_to_unit.delete(from.toString());
-                if (result != defeat)
-                    this.world.hex_to_unit.set(m.action.to.toString(), unit);
+                if (result == attack_capitol)
+                {
+                    if (enemy.lives == 1)
+                    {
+                        console.assert(m.action.type == GameLogic.attack_to);
+                        this.world.hex_to_unit.set(h_ult.toString(), unit);
+                    }
+                    else
+                    {
+                        console.assert(m.action.type == GameLogic.attack_bounce_to);
+                        this.world.hex_to_unit.set(h_penult.toString(), unit);
+                    }
+                }
+                else if (result == victory)
+                    this.world.hex_to_unit.set(h_ult.toString(), unit);
+                else if (result == draw)
+                    this.world.hex_to_unit.set(h_penult.toString(), unit);
+                else
+                    console.assert(result == defeat);
 
-                var h_ult = m.action.type == GameLogic.attack_to ? m.action.to : m.action.target;
-
-                var delay = unit.getAttackToDelay(h_ult, pf.findPath(m.action.from, h_ult));
+                var delay = unit.getAttackToDelay(h_ult, path);
                 greatest_delay = delay > greatest_delay ? delay : greatest_delay;
             }
             else if (m.action.type == GameLogic.recruit_at)

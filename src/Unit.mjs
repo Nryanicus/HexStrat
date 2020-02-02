@@ -246,7 +246,7 @@ export class Unit extends Phaser.GameObjects.Image
     {
         var delay = (path.length+4)*120;
         // delay depends on result
-        var enemy = this.scene.occupied.get(h_ult.toString());
+        var enemy = this.getGameState().occupied.get(h_ult.toString());
         var result = GameLogic.combatResult(this.type, enemy.type);
         if (result == victory)
             delay += 120;
@@ -265,6 +265,8 @@ export class Unit extends Phaser.GameObjects.Image
 
     attackTo(h_ult, path, is_ai=false)
     {
+        console.log("attack");
+        console.log(arguments);
         var from_hex = this.hex;
 
         this.can_move = false;

@@ -27,10 +27,14 @@ export class aStar
         this.cache = new Map(); // {Hex+Hex, [Hex]}
     }
 
-    findPath(start, goal)
+    findPath(start, goal, debug=false)
     {
         if (this.cache.has(start.toString()+goal.toString()))
+        {
+            if (debug)
+                console.log("cache hit for "+start.toString()+" to "+goal.toString());
             return this.cache.get(start.toString()+goal.toString());
+        }
 
         var open = new Set();
         open.add(start.toString());
