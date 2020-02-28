@@ -116,7 +116,7 @@ export class Unit extends Phaser.GameObjects.Image
         // don't want to list the same space twice, though we may be able to get there by multiple moves
         var marked_destinations = new Set(); 
 
-        var pf = this.getGameState().getPathfinderFor(this.hex, false);
+        var pf = this.getGameState().getPathfinderFor(this.hex);
 
         var previous_hex = this.hex;
         var flats = [];
@@ -125,9 +125,7 @@ export class Unit extends Phaser.GameObjects.Image
         {
             // we don't need the gamestate, just the action
             m = m.action;
-
             var h = m.to;
-            if (m.type == GameLogic.attack_bounce_to) h = m.target;
 
             // prevent duplicate indicators, see above
             if (marked_destinations.has(h.toString())) return;
@@ -246,7 +244,7 @@ export class Unit extends Phaser.GameObjects.Image
     {
         var delay = (path.length+4)*120;
         // delay depends on result
-        var enemy = this.getGameState().occupied.get(h_ult.toString());
+        var enemy = this.scene.hex_to_unit.get(h_ult.toString());
         var result = GameLogic.combatResult(this.type, enemy.type);
         if (result == victory)
             delay += 120;
@@ -257,7 +255,7 @@ export class Unit extends Phaser.GameObjects.Image
         else // attack cap
         {
             delay += 120;
-            if (enemy.lives == 1)
+            if (enemy.lives() == 1)
                 delay += 120;
         }
         return delay+600;
@@ -265,8 +263,6 @@ export class Unit extends Phaser.GameObjects.Image
 
     attackTo(h_ult, path, is_ai=false)
     {
-        console.log("attack");
-        console.log(arguments);
         var from_hex = this.hex;
 
         this.can_move = false;
@@ -289,7 +285,13 @@ export class Unit extends Phaser.GameObjects.Image
         }, this);
 
         // hitstop
-        console.assert(path.length > 0);
+        if (path.length == 0)
+        {
+            console.log(this);
+            console.log(arguments);
+            throw "zero length path in attackTo";
+        }
+        
         var h_penult = path[path.length-1];
         var p_penult = hexLib.hex_to_pixel(hex_layout, h_penult);
         var p_ult = hexLib.hex_to_pixel(hex_layout, h_ult);

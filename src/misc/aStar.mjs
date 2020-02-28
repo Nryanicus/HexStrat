@@ -29,11 +29,24 @@ export class aStar
 
     findPath(start, goal, debug=false)
     {
+        if (debug)
+        {
+            console.log("start",start);
+            console.log("goal",goal);
+        }
+        
         if (this.cache.has(start.toString()+goal.toString()))
         {
             if (debug)
                 console.log("cache hit for "+start.toString()+" to "+goal.toString());
             return this.cache.get(start.toString()+goal.toString());
+        }
+
+        if (!this.hex_set.has(goal.toString()))
+        {
+            if (debug)
+                console.log("goal hex not in world");
+            return [];
         }
 
         var open = new Set();
@@ -50,6 +63,11 @@ export class aStar
         while (open.size > 0)
         {
             var current = frontier.extractMinimum().value;
+            if (debug)
+            {
+                console.log("current",current);
+                console.log("closed",closed);
+            }
 
             if (current.toString() == goal.toString())
             {
@@ -62,10 +80,20 @@ export class aStar
 
             hexLib.hex_ring(current, 1).forEach(function(h)
             {
+                if (debug)
+                    console.log(h);
                 if (! this.hex_set.has(h.toString()) )
+                {
+                    if (debug)
+                        console.log("neighbour not in world, discarding");
                     return;
+                }
                 if ( closed.has(h.toString()))
+                {
+                    if (debug)
+                        console.log("neighbour in closed, discarding");
                     return;
+                }
 
                 var g_tmp = gScore.get(current.toString()) + 1;
 
@@ -80,6 +108,8 @@ export class aStar
             }, this);
         }
         // exhausted open without finding a path    
+        if (debug)
+            console.log("exhausted open without finding a path");
         return [];
     }
 }

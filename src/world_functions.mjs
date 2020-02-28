@@ -202,6 +202,16 @@ export function determineTerritories(world, players, pathfinder)
 
         var closest = bh.extractMinimum();
         var second_closest = bh.extractMinimum();
+        if (closest == null)
+        {
+            console.assert(false);
+            console.log(arguments);
+        }
+        if (second_closest == null)
+        {
+            console.assert(false);
+            console.log(arguments);
+        }
         var only_one_closest_single_player = true;
         // if the two closest units are equidistant and not on the same side then the hex is neutral
         while(closest.key == second_closest.key && only_one_closest_single_player)

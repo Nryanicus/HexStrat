@@ -14,9 +14,6 @@ export function greedy_ai(game_state)
         {
             var s = evaluation(moves[i], player_id);
             moves[i].score = s;
-            console.log(moves[i].action);
-            console.log(moves[i]);
-            console.log(s);
             if (s > best_score)
             {
                 best_score = s;
@@ -79,7 +76,7 @@ function evaluation(game_state, player_id)
         var score = 0;
         if (state.upkeeps[player_id] > state.incomes[player_id])
             score = -state.upkeeps[player_id];
-        return score-state.treasuries[player_id];
+        return score;//-state.treasuries[player_id];
     }
 
     // score on various metrics

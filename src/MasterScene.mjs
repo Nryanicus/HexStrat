@@ -17,6 +17,7 @@ export class MasterScene extends Phaser.Scene
 
     create()
     {
+        // this.aiPlayers = [false, false];
         this.aiPlayers = [false, false];
 
         this.registry.set(events.events, this.events);
@@ -29,11 +30,15 @@ export class MasterScene extends Phaser.Scene
     {
         var player_id = this.gameState.current_player;
         this.gameState = this.gameState.endTurnMove();
-        console.log("======ENDTURN=======");
-        console.log(this.gameState);
-        console.log("======ENDTURN=======");
         this.updateGameState();
         this.updateEconomyRegistry();
+        // bankrupcy check
+        if (this.gameState.treasuries[player_id] < 0)
+        {
+            this.events.emit(events.player_bankrupt, player_id);
+            this.updatePositions();
+        }
+
         this.events.emit(events.end_turn, player_id);
 
         if (this.aiPlayers[this.gameState.current_player])
@@ -141,13 +146,10 @@ export class MasterScene extends Phaser.Scene
     aiTurn()
     {
         var moves = greedy_ai(this.gameState);
-        console.log("===================AI turn===================");
-        console.log(this.gameState);
         var greatest_delay = 120;
         moves.forEach(function(m)
         {
             console.log(m.action);
-            console.log(m);
             if (m.action.type == GameLogic.move_to)
             {
                 var unit = this.world.hex_to_unit.get(m.action.from.toString());
@@ -160,44 +162,40 @@ export class MasterScene extends Phaser.Scene
                 var delay = unit.getMoveToDelay(m.action.to, pf.findPath(m.action.from, m.action.to));
                 greatest_delay = delay > greatest_delay ? delay : greatest_delay;
             }
-            else if (m.action.type == GameLogic.attack_to || m.action.type == GameLogic.attack_bounce_to)
+            else if (m.action.type == GameLogic.attack_to)
             {
                 var unit = this.world.hex_to_unit.get(m.action.from.toString());
                 var pf = this.gameState.getPathfinderFor(m.action.from);
 
-                var h_ult;
-                var h_penult;
-                if (m.action.type == GameLogic.attack_to)
-                {
-                    h_ult = m.action.to;
-                    h_penult = pf.findPath(m.action.from, h_ult)[path.length-1];
-                }
-                else
-                {
-                    h_ult = m.action.target;
-                    h_penult = m.action.to;
-                }
-
+                var h_ult = m.action.to;
+                var h_penult = m.action.penult;
                 var path = pf.findPath(m.action.from, h_penult);
+
+                if (path.length == 0)
+                {
+                    console.log(m.action.from, h_penult);
+                    pf = this.gameState.getPathfinderFor(m.action.from, true);
+                    path = pf.findPath(m.action.from, h_penult, true);
+                    console.log(path);
+
+                    console.log(this.gameState);
+                    console.log(m);
+                    console.log(m.action);
+                    throw "zero length path being passed to attackTo";
+                }
 
                 unit.attackTo(h_ult, path, true);
 
                 this.world.hex_to_unit.delete(m.action.from.toString());
                 
-                var enemy = this.world.hex_to_unit.get(h_ult.toString());
+                var enemy = this.gameState.occupied.get(h_ult.toString());
                 var result = GameLogic.combatResult(unit.type, enemy.type);
                 if (result == attack_capitol)
                 {
-                    if (enemy.lives == 1)
-                    {
-                        console.assert(m.action.type == GameLogic.attack_to);
+                    if (enemy.lives <= 1)
                         this.world.hex_to_unit.set(h_ult.toString(), unit);
-                    }
                     else
-                    {
-                        console.assert(m.action.type == GameLogic.attack_bounce_to);
                         this.world.hex_to_unit.set(h_penult.toString(), unit);
-                    }
                 }
                 else if (result == victory)
                     this.world.hex_to_unit.set(h_ult.toString(), unit);

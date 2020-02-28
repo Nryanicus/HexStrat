@@ -12,8 +12,7 @@ const BogusUnitType = "bogus unit type";
 
 // GameLogic actions
 export const move_to = "move_to"; // from, to
-export const attack_to = "attack_to"; // from, to
-export const attack_bounce_to = "attack_bounce_to"; // from, to, target
+export const attack_to = "attack_to"; // from, to, penult
 export const recruit_at = "recruit_at"; // owner_id, unit_type, hex
 export const end_turn = "end_turn"; // next_player_id, incomes
 
@@ -208,22 +207,34 @@ class GameState
     }
         
     // get all hexes that can be moved through by the given player, to be passed to an aStar
-    getValidMovementHexes(unit, hex)
+    getValidMovementHexes(unit, hex, debug=false)
     {
+        if (debug)
+            console.log("creating valid hex set for pathfinder");
         // determine where the unit can be placed
         var valid_positions = new Set();
         hexLib.hex_spiral(hex, unit_movement.get(unit.type)+1).forEach(function(h)
         {
             if (!this.world_hex_set.has(h.toString()))
+            {
+                if (debug)
+                    console.log(h,"not in world, skipping");
                 return;
+            }
             if (this.occupied.has(h.toString()) && this.occupied.get(h.toString()).owner_id != unit.owner_id)
+            {
+                if (debug)
+                    console.log(h,"occupied by enemy, skipping");
                 return;
+            }
             valid_positions.add(h.toString());
         }, this);
+        if (debug)
+            console.log(valid_positions);
         return valid_positions;
     }
 
-    getPathfinderFor(hex)
+    getPathfinderFor(hex, debug=false)
     {
         if (!this.occupied.has(hex.toString()))
         {
@@ -231,16 +242,19 @@ class GameState
             console.log(this.occupied);
             throw BadPathfinderRequest;
         }
-        return new aStar(this.getValidMovementHexes(this.occupied.get(hex.toString()), hex));
+        return new aStar(this.getValidMovementHexes(this.occupied.get(hex.toString()), hex, debug));
     }
 
     // remove all units of a given player, for bankrupcy or cap killing
-    removeAllUnits(player_id)
+    removeAllUnits(player_id, kill_cap)
     {
         this.occupied.forEach(function(unit, hex, map)
         {
-            if (unit.owner_id == player_id)
+            if (unit.owner_id == player_id && (kill_cap || !(hex.toString() == this.capitols[player_id].hex.toString())))
+            {
                 this.occupied.delete(hex);
+                this.upkeeps[player_id] -= unit_cost.get(unit.type);
+            }
         }, this);
     }
 
@@ -396,66 +410,44 @@ class GameState
             throw(BadTransistion);
         }
 
-        var move;
-        var result = combatResult(this.occupied.get(source.toString()).type, this.occupied.get(dest.toString()).type);
+        var move = this.clone();
+        var unit = move.occupied.get(source.toString());
+        var enemy = move.occupied.get(dest.toString());
+        var result = combatResult(unit.type, enemy.type);
+        unit.can_move = false;
+        move.action = {type: attack_to, from: source, to: dest, penult: penult};
+        move.occupied.delete(source.toString());
         if (result == victory)
         {
-            var move = this.clone();
-            var unit = move.occupied.get(source.toString());
-            move.occupied.delete(source.toString());
             move.occupied.set(dest.toString(), unit);
-            unit.can_move = false;
-            move.updateIncomes();
-            var enemy = move.occupied.get(dest.toString());
             move.upkeeps[enemy.owner_id] -= unit_cost.get(enemy.type);
-            move.action = {type: attack_to, from: source, to: dest};
         }
         else if (result == defeat)
         {
-            move = this.clone();
-            var unit = move.occupied.get(source.toString());
-            var enemy = move.occupied.get(dest.toString());
-            move.occupied.delete(source.toString());
-            move.action = {type: attack_to, from: source, to: dest};
             move.upkeeps[unit.owner_id] -= unit_cost.get(unit.type);
             enemy.can_move = false;
         }
         else if (result == draw)
         {
-            move = this.clone();
-            var unit = move.occupied.get(source.toString());
-            var enemy = move.occupied.get(dest.toString());
-            move.occupied.delete(source.toString());
             move.occupied.set(penult.toString(), unit);
-            unit.can_move = false;
             enemy.can_move = false;
-            move.action = {type: attack_bounce_to, from: source, to: penult, target: dest};
         }
         else // attack cap
         {
             if (!result == attack_capitol)
                 throw(BadTransistion);
-            move = this.clone();
-            var unit = move.occupied.get(source.toString());
-            unit.can_move = false;
-            var enemy = move.occupied.get(dest.toString());
-            if (enemy.lives == 1)
+            if (this.capitols[enemy.owner_id].lives == 1)
             {
-                move.removeAllUnits(enemy.owner_id);
+                move.removeAllUnits(enemy.owner_id, true);
                 move.occupied.set(dest.toString(), unit);
+
                 move.checkGameOver();
             }
             else
             {
-                var move = this.clone();
-                var unit = move.occupied.get(source.toString());
-                unit.can_move = false;
-
-                move.capitols[enemy.owner_id].lives--;
                 move.occupied.set(penult.toString(), unit);
-                move.occupied.delete(source.toString());
-                move.action = {type: attack_bounce_to, from: source, to: penult, target: dest};
             }
+            move.capitols[enemy.owner_id].lives--;
         }
         move.updateIncomes();
         return move;
@@ -471,7 +463,7 @@ class GameState
         move.treasuries[move.current_player] += net;
         // bankrupcy
         if (move.treasuries[move.current_player] < 0)
-            move.removeAllUnits(move.current_player);
+            move.removeAllUnits(move.current_player, false);
         // movement
         move.occupied.forEach(function(unit, hex, map)
         {

@@ -29,9 +29,6 @@ export class WorldScene extends Phaser.Scene
         this.hex_to_sprite = new Map();
         this.hex_to_owner = new Map();
 
-        this.territories;
-        this.closest_units;
-        this.capitol_positions;
         this.player_colours;
 
         this.hex_to_unit = new Map();

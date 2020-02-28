@@ -6,12 +6,39 @@ HexCursor still lagging
 Can double tap enter and have the AI turns fail is_current_player assertions
 
 ?? AI units moving through out of bounds hexes ??
+units can move through non-hex spaces sometimes?
 
-dead capitols not cleaned up properly
+Capitol not cleaned up correctly
+
+AI units 
+MasterScene.mjs:157 Uncaught TypeError: Cannot read property 'moveTo' of undefined
+after killing
 
 TODO:
 =============
-Juice: have enemy unit move back a single pixel when you mouse over next to them
+
+Multithread AI so it doesn't stop animations
+
+Optimise AI some
+
+Juice
+    have enemy unit move back a single pixel when you mouse over next to them
+
+    have selected unit move a bit towards the moused over destination
+
+UI
+    Show enemy move/attack ranges when clicking on them
+
+    Main menu
+        - Seed for PRNG world gen
+    Game menu
+        - graphs?!?
+        - gen new world
+    game over screen
+    
+    Your/AI Turn Transistion Plaque
+    
+    AI thinking spinner
 
 AI
     1. Kill capitols
@@ -27,20 +54,16 @@ AI
 
     sort AI moves so all recruits happen at the end and only the last is delayed
 
-debug option where UI/anim classes contruct a game state and compare it to the actual GameState
+Testing
+    debug option where UI/anim classes contruct a game state and compare it to the actual GameState
 
-stress test fast input to make sure tweens never put the game in an invalid representation
+    stress test fast input to make sure tweens never put the game in an invalid representation
+
+Game Balance
+    Unit costs need to be increased. Doubled? Double digit costs will require different UI...
 
 --------------------
 
-Main menu
-    - Seed for PRNG world gen
-Game menu
-    - graphs?!?
-    - gen new world
-game over screen
-Your/AI Turn Transistion Plaque
-AI thinking spinner
 
 NOTES:
 =============

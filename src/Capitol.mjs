@@ -324,8 +324,10 @@ export class Capitol extends Phaser.GameObjects.Container
         {
             if (this.getGameState().capitols[this.owner_id].lives == 0)
             {
+                this.scene.hex_to_sprite.delete(this.hex.toString());
                 this.getEvents().emit(events.player_bankrupt, this.owner_id);
                 // to cancel
+                this.getEvents().off(events.end_turn, this.handleEndTurn, this);
                 this.getEvents().off(events.close_menu, this.closeMenu, this);
                 this.getEvents().off(events.recruit, this.handleRecruitPlacement, this);
                 this.getEvents().off(events.cancel_recruitment, this.handleCancelRecruit, this);
